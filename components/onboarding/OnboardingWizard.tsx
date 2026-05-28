@@ -141,7 +141,7 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
       }
     } catch (e: any) {
       console.error('Onboarding failed:', e);
-      alert('Failed to save session. Moving to recommendation list directly.');
+      alert(`Failed to save session. Moving to recommendation list directly. Error details: ${e.message}`);
       router.push(`/${locale}/city/${selectedCity}`);
     } finally {
       setLoading(false);
