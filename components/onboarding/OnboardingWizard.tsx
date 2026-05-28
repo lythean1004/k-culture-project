@@ -17,7 +17,7 @@ const cityList = [
   { code: 'busan', name: 'Busan', nameKo: '부산', img: 'https://images.unsplash.com/photo-1578840602674-bd891cb7ea5b?auto=format&fit=crop&w=300&q=80' },
   { code: 'gyeongju', name: 'Gyeongju', nameKo: '경주', img: 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?auto=format&fit=crop&w=300&q=80' },
   { code: 'jeonju', name: 'Jeonju', nameKo: '전주', img: 'https://images.unsplash.com/photo-1590001155093-a3c66ab0c3ff?auto=format&fit=crop&w=300&q=80' },
-  { code: 'namwon', name: 'Namwon', nameKo: '남원', img: 'https://images.unsplash.com/photo-1599839617618-971c26b8b0e8?auto=format&fit=crop&w=300&q=80' },
+  { code: 'namwon', name: 'Namwon', nameKo: '남원', img: 'https://images.unsplash.com/photo-1616058097781-80bb6e2a76f6?auto=format&fit=crop&w=300&q=80' },
 ];
 
 const transportModes = [
