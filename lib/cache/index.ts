@@ -4,6 +4,7 @@ const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
 class RedisCache {
   private client: Redis | null = null;
+  private memoryCache = new Map<string, { value: string; expiresAt?: number }>();
 
   constructor() {
     if (typeof window === 'undefined') {
@@ -19,16 +20,33 @@ class RedisCache {
   }
 
   async get(key: string): Promise<string | null> {
+    // 1. Try Memory cache first
+    const memoryItem = this.memoryCache.get(key);
+    if (memoryItem) {
+      if (!memoryItem.expiresAt || memoryItem.expiresAt > Date.now()) {
+        return memoryItem.value;
+      }
+      this.memoryCache.delete(key);
+    }
+
     if (!this.client) return null;
     try {
-      return await this.client.get(key);
+      const val = await this.client.get(key);
+      if (val) {
+        // Sync back to memory
+        this.memoryCache.set(key, { value: val });
+      }
+      return val;
     } catch (e) {
-      console.warn('[Cache] Redis is offline. Bypassing get cache.');
+      console.warn('[Cache] Redis is offline. Bypassing get cache to memory.');
       return null;
     }
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : undefined;
+    this.memoryCache.set(key, { value, expiresAt });
+
     if (!this.client) return;
     try {
       if (ttlSeconds) {
@@ -37,11 +55,13 @@ class RedisCache {
         await this.client.set(key, value);
       }
     } catch (e) {
-      console.warn('[Cache] Redis is offline. Bypassing set cache.');
+      console.warn('[Cache] Redis is offline. Bypassing set cache to memory.');
     }
   }
 
   async del(key: string): Promise<void> {
+    this.memoryCache.delete(key);
+
     if (!this.client) return;
     try {
       await this.client.del(key);

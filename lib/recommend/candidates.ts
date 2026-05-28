@@ -96,12 +96,12 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
   
   const { data: places } = await supabaseAdmin
     .from('places')
-    .select('place_id, name_ko, lat, lng, primary_type, sub_type, official_url, phone, place_theme_map(theme_id, themes(code))')
+    .select('place_id, name_ko, lat, lng, primary_type, sub_type, official_url, phone, place_theme_map(theme_id, themes(code)), place_i18n(lang, name)')
     .eq('city_id', cityId);
     
   const { data: events } = await supabaseAdmin
     .from('events')
-    .select('event_id, title_ko, official_url, genre')
+    .select('event_id, title_ko, official_url, genre, event_i18n(lang, title)')
     .eq('city_id', cityId)
     .eq('status', 'ACTIVE');
 
@@ -114,12 +114,20 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
       ? themeMaps.map((tm: any) => tm.themes?.code as ThemeCode).filter(Boolean) 
       : [];
       
+    const nameI18n: Record<string, string> = {};
+    if (Array.isArray(p.place_i18n)) {
+      p.place_i18n.forEach((item: any) => {
+        nameI18n[item.lang] = item.name;
+      });
+    }
+      
     candidates.push({
       id: p.place_id,
       entityType: 'PLACE',
       primaryType: p.primary_type,
       subType: p.sub_type || undefined,
       nameKo: p.name_ko,
+      nameI18n,
       lat: p.lat ? parseFloat(p.lat) : undefined,
       lng: p.lng ? parseFloat(p.lng) : undefined,
       qualityGrade: 'A',
@@ -131,11 +139,19 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
   });
   
   events?.forEach((e: any) => {
+    const nameI18n: Record<string, string> = {};
+    if (Array.isArray(e.event_i18n)) {
+      e.event_i18n.forEach((item: any) => {
+        nameI18n[item.lang] = item.title;
+      });
+    }
+
     candidates.push({
       id: e.event_id,
       entityType: 'EVENT',
       primaryType: 'PERFORMANCE',
       nameKo: e.title_ko,
+      nameI18n,
       qualityGrade: 'B',
       officialUrl: e.official_url || undefined,
       source: 'rule',
@@ -188,6 +204,7 @@ export async function generateCandidates(
         entityType: 'PLACE',
         primaryType: p.primary_type,
         nameKo: p.name,
+        nameI18n: { [input.lang]: p.name },
         lat: p.lat,
         lng: p.lng,
         qualityGrade: 'A',

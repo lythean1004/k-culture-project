@@ -29,7 +29,7 @@ export interface Candidate {
   primaryType: string;
   subType?: string;
   nameKo: string;
-  nameI18n?: string;
+  nameI18n?: Record<string, string>;
   lat?: number;
   lng?: number;
   qualityGrade: 'A' | 'B' | 'B_MINUS' | 'C';
@@ -82,6 +82,9 @@ export interface PackageItem {
   lat?: number;
   lng?: number;
   slotType: 'MORNING' | 'LUNCH' | 'AFTERNOON' | 'EVENING' | 'NIGHT';
+  nameKo?: string;
+  nameI18n?: Record<string, string>;
+  primaryType?: string;
 }
 
 export interface RecommendedPackage {
@@ -94,4 +97,7 @@ export interface RecommendedPackage {
   totalScore: number;
   scoreBreakdown: ScoreBreakdown;
   weatherFallback?: PackageItem[];
+  cityName?: string;
+  durationHours?: number;
+  reasonTextSource?: 'LLM_GENERATED' | 'TEMPLATE_FALLBACK';
 }

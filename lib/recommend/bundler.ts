@@ -38,6 +38,9 @@ function bundleDayTrip(scored: ScoredCandidate[], input: RecommendInput): Recomm
       lat: anchor.lat,
       lng: anchor.lng,
       slotType: 'MORNING',
+      nameKo: anchor.nameKo,
+      nameI18n: anchor.nameI18n,
+      primaryType: anchor.primaryType,
     });
 
     // Sub place (afternoon slot)
@@ -51,6 +54,9 @@ function bundleDayTrip(scored: ScoredCandidate[], input: RecommendInput): Recomm
         lat: sub.lat,
         lng: sub.lng,
         slotType: 'AFTERNOON',
+        nameKo: sub.nameKo,
+        nameI18n: sub.nameI18n,
+        primaryType: sub.primaryType,
       });
     }
 
@@ -65,6 +71,9 @@ function bundleDayTrip(scored: ScoredCandidate[], input: RecommendInput): Recomm
         lat: event.lat,
         lng: event.lng,
         slotType: 'EVENING',
+        nameKo: event.nameKo,
+        nameI18n: event.nameI18n,
+        primaryType: event.primaryType,
       });
     }
 
@@ -77,6 +86,8 @@ function bundleDayTrip(scored: ScoredCandidate[], input: RecommendInput): Recomm
       items,
       totalScore: anchor.score.total + (sub ? sub.score.total : 0) + (event ? event.score.total : 0),
       scoreBreakdown: anchor.score.breakdown,
+      cityName: input.cityCode.toUpperCase(),
+      durationHours: 8,
     });
   });
 
@@ -100,6 +111,9 @@ function bundleStay(scored: ScoredCandidate[], input: RecommendInput): Recommend
         lat: themePlaces[0].lat,
         lng: themePlaces[0].lng,
         slotType: 'MORNING',
+        nameKo: themePlaces[0].nameKo,
+        nameI18n: themePlaces[0].nameI18n,
+        primaryType: themePlaces[0].primaryType,
       },
       {
         id: `item-${themePlaces[1].id}-d2-afternoon`,
@@ -109,6 +123,9 @@ function bundleStay(scored: ScoredCandidate[], input: RecommendInput): Recommend
         lat: themePlaces[1].lat,
         lng: themePlaces[1].lng,
         slotType: 'AFTERNOON',
+        nameKo: themePlaces[1].nameKo,
+        nameI18n: themePlaces[1].nameI18n,
+        primaryType: themePlaces[1].primaryType,
       }
     ];
 
@@ -121,6 +138,8 @@ function bundleStay(scored: ScoredCandidate[], input: RecommendInput): Recommend
       items,
       totalScore: themePlaces[0].score.total + themePlaces[1].score.total,
       scoreBreakdown: themePlaces[0].score.breakdown,
+      cityName: input.cityCode.toUpperCase(),
+      durationHours: 36,
     });
   });
 
@@ -143,6 +162,9 @@ function bundleThemeTour(scored: ScoredCandidate[], input: RecommendInput): Reco
       lat: p.lat,
       lng: p.lng,
       slotType: idx === 0 ? 'MORNING' : idx === 1 ? 'LUNCH' : idx === 2 ? 'AFTERNOON' : 'EVENING',
+      nameKo: p.nameKo,
+      nameI18n: p.nameI18n,
+      primaryType: p.primaryType,
     }));
 
     packages.push({
@@ -154,6 +176,8 @@ function bundleThemeTour(scored: ScoredCandidate[], input: RecommendInput): Reco
       items,
       totalScore: items.reduce((acc, curr) => acc + (scored.find(s => s.id === curr.refId)?.score.total || 0), 0),
       scoreBreakdown: themePlaces[0].score.breakdown,
+      cityName: input.cityCode.toUpperCase(),
+      durationHours: 12,
     });
   });
 

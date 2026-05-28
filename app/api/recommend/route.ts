@@ -7,6 +7,7 @@ import { applyFilters } from '../../../lib/recommend/filters';
 import { scoreCandidate } from '../../../lib/recommend/scorer';
 import { aiRerank } from '../../../lib/recommend/ai-rerank';
 import { bundlePackages } from '../../../lib/recommend/bundler';
+import { generateReasonText } from '../../../lib/recommend/reason';
 import { RecommendContext, RecommendInput, ThemeCode } from '../../../lib/recommend/types';
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 
@@ -61,6 +62,7 @@ async function savePackages(packages: any[], input: any) {
   
   for (const pkg of packages) {
     try {
+      const reasonSource = pkg.reasonTextSource === 'LLM_GENERATED' ? 'LLM_GENERATED' : 'MT_GLOSSARY';
       const { data: insertedPkg, error } = await supabaseAdmin
         .from('packages')
         .insert({
@@ -68,6 +70,7 @@ async function savePackages(packages: any[], input: any) {
           title: pkg.title,
           summary: pkg.summary,
           reason_text: pkg.reasonText,
+          reason_text_source: reasonSource,
           lang: input.lang,
         })
         .select('package_id')
@@ -115,9 +118,11 @@ export async function POST(req: NextRequest) {
     const reranked = await aiRerank(scored, input);
     const packages = bundlePackages(reranked, input);
     
-    // Reason text placeholder for step 8
+    // Generate reason texts via AI or templates
     for (const pkg of packages) {
-      pkg.reasonText = `Curated for your ${input.visitForm} trip in ${input.cityCode}.`;
+      const { text, source } = await generateReasonText(pkg, input, context);
+      pkg.reasonText = text;
+      pkg.reasonTextSource = source;
     }
     
     const result = { packages };
