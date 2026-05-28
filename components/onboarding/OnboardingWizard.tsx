@@ -86,8 +86,8 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
   };
 
   const handleComplete = async () => {
-    if (interests.length === 0) {
-      alert('Please select at least 1 interest.');
+    if (interests.length === 0 && freeTextQuery.trim().length === 0) {
+      alert('Please select at least 1 interest or enter what you want to do.');
       return;
     }
     
@@ -341,9 +341,9 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
           <button
             type="button"
             onClick={handleComplete}
-            disabled={interests.length === 0 || loading}
+            disabled={(interests.length === 0 && freeTextQuery.trim().length === 0) || loading}
             className={`px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
-              interests.length === 0 || loading
+              (interests.length === 0 && freeTextQuery.trim().length === 0) || loading
                 ? 'opacity-40 cursor-not-allowed bg-slate-800 text-slate-500'
                 : 'bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white shadow-lg shadow-purple-500/20'
             }`}
