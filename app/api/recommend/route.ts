@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const input = RecommendInputSchema.parse(body) as unknown as RecommendInput;
     
-    // Bump version to v2 to burst old caches (e.g. invalid Seoul fallback for Busan)
-    const cacheKey = `rec:v2:${hashInput(input)}`;
+    // Bump version to v3 to invalidate stale caches
+    const cacheKey = `rec:v3:${hashInput(input)}`;
     const cached = await cache.get(cacheKey);
     if (cached) {
       return Response.json(JSON.parse(cached));
