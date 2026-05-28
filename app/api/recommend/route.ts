@@ -104,8 +104,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const input = RecommendInputSchema.parse(body) as unknown as RecommendInput;
     
-    // Bump version to v3 to invalidate stale caches
-    const cacheKey = `rec:v3:${hashInput(input)}`;
+    // Bump version to v4 to invalidate stale caches and use proper UUID mocks
+    const cacheKey = `rec:v4:${hashInput(input)}`;
     const cached = await cache.get(cacheKey);
     if (cached) {
       return Response.json(JSON.parse(cached));
