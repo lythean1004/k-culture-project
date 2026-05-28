@@ -54,41 +54,33 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
   const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
   
   if (!hasSupabase) {
-    // Return mock data when Supabase is not configured
+    // Return city-specific mock data when Supabase is not configured
+    if (input.cityCode === 'busan') {
+      return [
+        { id: 'place-busan-1', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '해운대 해수욕장', lat: 35.1587, lng: 129.1604, qualityGrade: 'A', source: 'rule', themes: ['NIGHT', 'FAMILY'] },
+        { id: 'place-busan-2', entityType: 'PLACE', primaryType: 'MUSEUM', nameKo: '부산박물관', lat: 35.1295, lng: 129.0934, qualityGrade: 'A', source: 'rule', themes: ['HISTORY'] },
+        { id: 'event-busan-1', entityType: 'EVENT', primaryType: 'PERFORMANCE', nameKo: '광안리 어방축제', lat: 35.1532, lng: 129.1186, qualityGrade: 'B', source: 'rule', themes: ['FESTIVAL'] }
+      ];
+    } else if (input.cityCode === 'gyeongju') {
+      return [
+        { id: 'place-gj-1', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '불국사', lat: 35.7901, lng: 129.3320, qualityGrade: 'A', source: 'rule', themes: ['HISTORY', 'WELLNESS'] },
+        { id: 'place-gj-2', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '동궁과 월지', lat: 35.8348, lng: 129.2266, qualityGrade: 'A', source: 'rule', themes: ['NIGHT', 'HISTORY'] }
+      ];
+    } else if (input.cityCode === 'jeonju') {
+      return [
+        { id: 'place-jj-1', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '전주 한옥마을', lat: 35.8147, lng: 127.1526, qualityGrade: 'A', source: 'rule', themes: ['HISTORY', 'FOOD'] }
+      ];
+    } else if (input.cityCode === 'namwon') {
+      return [
+        { id: 'place-nw-1', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '광한루원', lat: 35.4057, lng: 127.3804, qualityGrade: 'A', source: 'rule', themes: ['HISTORY', 'NIGHT'] }
+      ];
+    }
+    
+    // Default to Seoul
     return [
-      {
-        id: 'place-uuid-1',
-        entityType: 'PLACE',
-        primaryType: 'ATTRACTION',
-        nameKo: '경복궁',
-        lat: 37.5796,
-        lng: 126.9770,
-        qualityGrade: 'A',
-        source: 'rule',
-        themes: ['HISTORY'],
-      },
-      {
-        id: 'place-uuid-2',
-        entityType: 'PLACE',
-        primaryType: 'MUSEUM',
-        nameKo: '국립중앙박물관',
-        lat: 37.5240,
-        lng: 126.9804,
-        qualityGrade: 'A',
-        source: 'rule',
-        themes: ['HISTORY', 'MODERN_ART'],
-      },
-      {
-        id: 'event-uuid-1',
-        entityType: 'EVENT',
-        primaryType: 'PERFORMANCE',
-        nameKo: '전통 국악 공연',
-        lat: 37.5240,
-        lng: 126.9804,
-        qualityGrade: 'B',
-        source: 'rule',
-        themes: ['TRADITIONAL_MUSIC'],
-      }
+      { id: 'place-seoul-1', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '경복궁', lat: 37.5796, lng: 126.9770, qualityGrade: 'A', source: 'rule', themes: ['HISTORY'] },
+      { id: 'place-seoul-2', entityType: 'PLACE', primaryType: 'MUSEUM', nameKo: '국립중앙박물관', lat: 37.5240, lng: 126.9804, qualityGrade: 'A', source: 'rule', themes: ['HISTORY', 'MODERN_ART'] },
+      { id: 'event-seoul-1', entityType: 'EVENT', primaryType: 'PERFORMANCE', nameKo: '전통 국악 공연', lat: 37.5240, lng: 126.9804, qualityGrade: 'B', source: 'rule', themes: ['TRADITIONAL_MUSIC'] }
     ];
   }
   
