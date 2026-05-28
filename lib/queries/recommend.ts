@@ -12,8 +12,9 @@ export function useRecommendation(input: RecommendInput) {
   return useQuery<RecommendResponse>({
     queryKey: ['recommend', input.lang, input.cityCode, input.visitForm, input.interests.join(','), input.transportMode, input.freeTextQuery],
     queryFn: async () => {
-      // client-side fetching to the Next.js API Route
-      const response = await ofetch<RecommendResponse>('/api/recommend', {
+      // client-side fetching to the Next.js API Route with cache-buster
+      const cacheBuster = new Date().getTime();
+      const response = await ofetch<RecommendResponse>(`/api/recommend?_t=${cacheBuster}`, {
         method: 'POST',
         body: input,
       });
