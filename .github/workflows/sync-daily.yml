@@ -1,0 +1,33 @@
+name: Daily Sync
+
+on:
+  schedule:
+    - cron: '0 18 * * *'  # UTC 18:00 = KST 03:00
+  workflow_dispatch:      # 수동 트리거 허용
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run TourAPI Sync Script
+        run: npx tsx scripts/sync-tourapi.ts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TOURAPI_KEY: ${{ secrets.TOURAPI_KEY }}
+          TOURAPI_KEY_EN: ${{ secrets.TOURAPI_KEY_EN }}
+          TOURAPI_KEY_JA: ${{ secrets.TOURAPI_KEY_JA }}
+          TOURAPI_KEY_ZH: ${{ secrets.TOURAPI_KEY_ZH }}
+          DATA_GO_KR_API_KEY: ${{ secrets.DATA_GO_KR_API_KEY }}

@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/sync/tourapi",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/sync/kopis",
+      "schedule": "0 18 * * 0"
+    }
+  ]
+}
