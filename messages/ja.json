@@ -1,19 +1,81 @@
 {
-  "Common": {
-    "title": "K-Culture Curation Platform",
-    "description": "あなた에 맞춘 문화 관광 패키지를 발견하세요.",
-    "selectLanguage": "言語を選択",
+  "common": {
+    "appName": "K-Culture",
+    "start": "スタート",
     "next": "次へ",
-    "back": "戻る"
+    "back": "戻る",
+    "explore": "探索する",
+    "or": "または",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "official": "公式",
+    "aiAssisted": "AIアシスト",
+    "manual": "手動キュレーション"
   },
-  "Landing": {
-    "welcome": "韓国へようこそ",
-    "start": "スタート"
+  "landing": {
+    "headline": "あなただけの特別な韓国旅行",
+    "sub": "韓国の公共データを活用したオーダーメイドの文化旅行プランを提供します",
+    "startInterest": "興味のある分野から始める →",
+    "badgeHigh": "高カバレッジ",
+    "badgeMedium": "中カバレッジ",
+    "badgeLow": "低カバレッジ"
   },
-  "Onboarding": {
-    "title": "旅行について教えてください",
-    "selectCity": "どの都市を探索したいですか？",
-    "selectType": "どのような旅行スタイルですか？",
-    "selectInterest": "何に興味がありますか？"
+  "onboarding": {
+    "step1": {
+      "title": "言語を選択してください",
+      "description": "旅行案内を表示する言語を選択します。"
+    },
+    "step2": {
+      "title": "どちらへ行きたいですか？",
+      "description": "オーダーメイド旅行を計画する都市を選択してください。"
+    },
+    "step3": {
+      "title": "どれくらいの期間滞在しますか？",
+      "description": "滞在プランとご希望の移動手段を選択してください。",
+      "dayTrip": "日帰り旅行",
+      "stay13": "1〜3日間の滞在",
+      "themeTour": "テーマツアー",
+      "visitFormLabel": "旅行形態",
+      "transportLabel": "希望する移動手段",
+      "WALK": "徒歩",
+      "TRANSIT": "公共交通機関",
+      "CAR": "車 / タクシー"
+    },
+    "step4": {
+      "title": "どのようなことに関心がありますか？",
+      "description": "関心のあるテーマを1〜3個選択してください。ご自身の言葉で自由に入力することもできます。",
+      "history": "歴史と伝統",
+      "traditionalMusic": "伝統音楽・国楽",
+      "modernArt": "現代美術",
+      "family": "ファミリー・キッズ",
+      "night": "夜景",
+      "wellness": "ウェルネスと自然",
+      "food": "韓国グルメ",
+      "festival": "お祭り・シーズンイベント",
+      "freeTextHint": "または、希望する旅行内容をご自身の言葉で記述してください...",
+      "locationConsent": "現在地情報の使用に同意する（任意）",
+      "complete": "おすすめプランを生成"
+    }
+  },
+  "package": {
+    "duration": "{hours} 時間",
+    "stops": "{count} カ所",
+    "swapButton": "このスポットを変更",
+    "officialSite": "公式サイト",
+    "save": "日程を保存",
+    "share": "リンクを共有",
+    "saved": "保存済み",
+    "shareSuccess": "リンクがクリップボードにコピーされました！",
+    "weatherPrompt": "天気情報",
+    "weatherHintIndoor": "雨が予想されます。屋内観光地をおすすめします。",
+    "weatherHintClear": "晴れています。屋外アクティビティに適した日です。",
+    "swapModalTitle": "スポットの変更",
+    "swapModalDesc": "このスポットの代わりとなる観光地を選択してください。",
+    "showMoreThemes": "他のテーマを表示"
+  },
+  "ai": {
+    "generatedBadge": "AIアシスト",
+    "officialBadge": "公式",
+    "manualBadge": "手動キュレーション"
   }
 }

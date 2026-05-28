@@ -33,7 +33,7 @@ export class VllmProvider {
       response_format: req.responseFormat === 'json' ? { type: 'json_object' } : undefined,
       tools: req.tools?.map(t => ({
         type: 'function' as const,
-        function: { name: t.name, description: t.description, parameters: t.parameters }
+        function: { name: t.name, description: t.description, parameters: t.parameters as any }
       })),
     });
     
@@ -43,8 +43,8 @@ export class VllmProvider {
       content: choice.message.content ?? '',
       toolCalls: choice.message.tool_calls?.map(tc => ({
         id: tc.id,
-        name: tc.function.name,
-        arguments: JSON.parse(tc.function.arguments),
+        name: (tc as any).function.name,
+        arguments: JSON.parse((tc as any).function.arguments),
       })),
       tokensIn: completion.usage?.prompt_tokens ?? 0,
       tokensOut: completion.usage?.completion_tokens ?? 0,

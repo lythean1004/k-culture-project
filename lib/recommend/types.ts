@@ -38,6 +38,7 @@ export interface Candidate {
   source: string;
   semanticSimilarity?: number;
   themes: ThemeCode[];
+  indoorOutdoor?: 'INDOOR' | 'OUTDOOR' | 'MIXED' | string;
 }
 
 export interface RecommendContext {

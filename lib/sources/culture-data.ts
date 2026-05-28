@@ -57,7 +57,8 @@ async function fetchCultureApi(url: string, query: Record<string, any>): Promise
         throw new SourceApiError('CULTURE_DATA', 200, true, `CultureData Error: ${header.resultMsg}`);
       }
 
-      const items = parsed.data.response.body?.items?.item;
+      const itemsBody = parsed.data.response.body?.items;
+      const items = (itemsBody && typeof itemsBody === 'object' && 'item' in itemsBody) ? itemsBody.item : undefined;
       if (!items) return [];
       return Array.isArray(items) ? items : [items];
     } catch (error: any) {

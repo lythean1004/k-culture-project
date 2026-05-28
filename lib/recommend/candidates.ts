@@ -96,7 +96,7 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
   
   const { data: places } = await supabaseAdmin
     .from('places')
-    .select('place_id, name_ko, lat, lng, primary_type, sub_type, official_url, phone, place_theme_map(theme_id, themes(code)), place_i18n(lang, name)')
+    .select('place_id, name_ko, lat, lng, primary_type, sub_type, indoor_outdoor, official_url, phone, place_theme_map(theme_id, themes(code)), place_i18n(lang, name)')
     .eq('city_id', cityId);
     
   const { data: events } = await supabaseAdmin
@@ -135,6 +135,7 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
       phone: p.phone || undefined,
       source: 'rule',
       themes,
+      indoorOutdoor: p.indoor_outdoor || undefined,
     });
   });
   

@@ -1,19 +1,81 @@
 {
-  "Common": {
-    "title": "K-Culture Curation Platform",
-    "description": "为您量身定制的韩国文化观光推荐套餐。",
-    "selectLanguage": "选择语言",
+  "common": {
+    "appName": "K-Culture",
+    "start": "开始",
     "next": "下一步",
-    "back": "返回"
+    "back": "返回",
+    "explore": "探索",
+    "or": "或",
+    "cancel": "取消",
+    "confirm": "确认",
+    "official": "官方",
+    "aiAssisted": "AI辅助",
+    "manual": "人工策划"
   },
-  "Landing": {
-    "welcome": "欢迎来到韩国",
-    "start": "开始"
+  "landing": {
+    "headline": "探索韩国，随心所欲",
+    "sub": "基于韩国公共数据的定制文化之旅",
+    "startInterest": "从您的兴趣开始 →",
+    "badgeHigh": "高覆盖度",
+    "badgeMedium": "中覆盖度",
+    "badgeLow": "低覆盖度"
   },
-  "Onboarding": {
-    "title": "请选择您的旅行偏好",
-    "selectCity": "您想探索哪个城市？",
-    "selectType": "您的出行方式是？",
-    "selectInterest": "您的兴趣点是什么？"
+  "onboarding": {
+    "step1": {
+      "title": "选择您的语言",
+      "description": "请选择您希望使用的服务语言。"
+    },
+    "step2": {
+      "title": "您想去哪里？",
+      "description": "选择一个韩国城市来规划您的定制文化之旅。"
+    },
+    "step3": {
+      "title": "您将停留多久？",
+      "description": "选择您的行程类型和首选交通方式。",
+      "dayTrip": "一日游",
+      "stay13": "1-3天住宿游",
+      "themeTour": "主题游",
+      "visitFormLabel": "行程类型",
+      "transportLabel": "首选交通方式",
+      "WALK": "徒步",
+      "TRANSIT": "公共交通",
+      "CAR": "汽车 / 出租车"
+    },
+    "step4": {
+      "title": "您对什么感兴趣？",
+      "description": "选择 1 到 3 个兴趣。您也可以用自己的语言进行描述。",
+      "history": "历史与传统遗产",
+      "traditionalMusic": "传统音乐与国乐",
+      "modernArt": "现代艺术",
+      "family": "亲子家庭",
+      "night": "夜景",
+      "wellness": "康养与自然",
+      "food": "韩国美食",
+      "festival": "节日活动",
+      "freeTextHint": "或用您自己的语言描述您想要什么...",
+      "locationConsent": "同意使用当前位置（可选）",
+      "complete": "生成推荐方案"
+    }
+  },
+  "package": {
+    "duration": "{hours} 小时",
+    "stops": "{count} 个景点",
+    "swapButton": "更换此景点",
+    "officialSite": "官方网站",
+    "save": "保存行程",
+    "share": "分享链接",
+    "saved": "已保存",
+    "shareSuccess": "链接已复制到剪贴板！",
+    "weatherPrompt": "天气信息",
+    "weatherHintIndoor": "预计有雨。建议选择室内景点。",
+    "weatherHintClear": "天气晴朗。适合进行户外活动。",
+    "swapModalTitle": "更换此景点",
+    "swapModalDesc": "选择一个替代地点来更换当前景点。",
+    "showMoreThemes": "展示更多主题"
+  },
+  "ai": {
+    "generatedBadge": "AI辅助",
+    "officialBadge": "官方",
+    "manualBadge": "人工策划"
   }
 }

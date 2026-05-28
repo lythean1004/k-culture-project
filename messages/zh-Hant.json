@@ -1,19 +1,81 @@
 {
-  "Common": {
-    "title": "K-Culture Curation Platform",
-    "description": "為您量身定制的韓國文化觀光推薦套餐。",
-    "selectLanguage": "選擇語言",
+  "common": {
+    "appName": "K-Culture",
+    "start": "開始",
     "next": "下一步",
-    "back": "返回"
+    "back": "返回",
+    "explore": "探索",
+    "or": "或",
+    "cancel": "取消",
+    "confirm": "確認",
+    "official": "官方",
+    "aiAssisted": "AI輔助",
+    "manual": "人工策劃"
   },
-  "Landing": {
-    "welcome": "歡迎來到韓國",
-    "start": "開始"
+  "landing": {
+    "headline": "探索韓國，隨心所欲",
+    "sub": "基於韓國公共數據的定制文化之旅",
+    "startInterest": "從您的興趣開始 →",
+    "badgeHigh": "高覆蓋度",
+    "badgeMedium": "中覆蓋度",
+    "badgeLow": "低覆蓋度"
   },
-  "Onboarding": {
-    "title": "請選擇您的旅行偏好",
-    "selectCity": "您想探索哪個城市？",
-    "selectType": "您的出行方式是？",
-    "selectInterest": "您的興趣點是什麼？"
+  "onboarding": {
+    "step1": {
+      "title": "選擇您的語言",
+      "description": "請選擇您希望使用的服務語言。"
+    },
+    "step2": {
+      "title": "您想去哪裡？",
+      "description": "選擇一個韓國城市來規劃您的定制文化之旅。"
+    },
+    "step3": {
+      "title": "您將停留多久？",
+      "description": "選擇您的行程類型和首選交通方式。",
+      "dayTrip": "一日遊",
+      "stay13": "1-3天住宿遊",
+      "themeTour": "主題遊",
+      "visitFormLabel": "行程類型",
+      "transportLabel": "首選交通方式",
+      "WALK": "徒步",
+      "TRANSIT": "公共交通",
+      "CAR": "汽車 / 出租車"
+    },
+    "step4": {
+      "title": "您對什麼感興趣？",
+      "description": "選擇 1 到 3 個興趣。您也可以用自己的語言進行描述。",
+      "history": "歷史與傳統遺產",
+      "traditionalMusic": "傳統音樂與國樂",
+      "modernArt": "現代藝術",
+      "family": "親子家庭",
+      "night": "夜景",
+      "wellness": "康養與自然",
+      "food": "韓國美食",
+      "festival": "節日活動",
+      "freeTextHint": "或用您自己的語言描述您想要什麼...",
+      "locationConsent": "同意使用當前位置（選填）",
+      "complete": "生成推薦方案"
+    }
+  },
+  "package": {
+    "duration": "{hours} 小時",
+    "stops": "{count} 個景點",
+    "swapButton": "更換此景點",
+    "officialSite": "官方網站",
+    "save": "保存行程",
+    "share": "分享鏈接",
+    "saved": "已保存",
+    "shareSuccess": "鏈接已複製到剪貼板！",
+    "weatherPrompt": "天氣資訊",
+    "weatherHintIndoor": "預計有雨。建議選擇室內景點。",
+    "weatherHintClear": "天氣晴朗。適合進行戶外活動。",
+    "swapModalTitle": "更換此景點",
+    "swapModalDesc": "選擇一個替代地點來更換當前景點。",
+    "showMoreThemes": "展示更多主題"
+  },
+  "ai": {
+    "generatedBadge": "AI輔助",
+    "officialBadge": "官方",
+    "manualBadge": "人工策劃"
   }
 }

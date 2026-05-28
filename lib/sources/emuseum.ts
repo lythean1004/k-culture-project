@@ -71,7 +71,8 @@ async function fetchEmuseumApi(path: string, query: Record<string, any>): Promis
         throw new SourceApiError('EMUSEUM', 200, true, `e-Museum Error: ${header.resultMsg}`);
       }
 
-      const items = validated.data.response.body?.items?.item;
+      const itemsBody = validated.data.response.body?.items;
+      const items = (itemsBody && typeof itemsBody === 'object' && 'item' in itemsBody) ? itemsBody.item : undefined;
       if (!items) return [];
       return Array.isArray(items) ? items : [items];
     } catch (error: any) {

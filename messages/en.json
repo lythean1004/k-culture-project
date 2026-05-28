@@ -1,19 +1,81 @@
 {
-  "Common": {
-    "title": "K-Culture Curation Platform",
-    "description": "Discover cultural tourism packages tailored just for you.",
-    "selectLanguage": "Select Language",
+  "common": {
+    "appName": "K-Culture",
+    "start": "Start",
     "next": "Next",
-    "back": "Back"
+    "back": "Back",
+    "explore": "Explore",
+    "or": "or",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "official": "Official",
+    "aiAssisted": "AI-assisted",
+    "manual": "Manually Curated"
   },
-  "Landing": {
-    "welcome": "Welcome to Korea",
-    "start": "Get Started"
+  "landing": {
+    "headline": "Discover Korea, your way",
+    "sub": "Curated cultural journeys powered by Korean public data",
+    "startInterest": "Start with your interests →",
+    "badgeHigh": "High Coverage",
+    "badgeMedium": "Medium Coverage",
+    "badgeLow": "Low Coverage"
   },
-  "Onboarding": {
-    "title": "Tell us about your trip",
-    "selectCity": "Which city do you want to explore?",
-    "selectType": "How are you traveling?",
-    "selectInterest": "What are you interested in?"
+  "onboarding": {
+    "step1": {
+      "title": "Choose your language",
+      "description": "Select the language you want to explore with."
+    },
+    "step2": {
+      "title": "Where would you like to go?",
+      "description": "Choose a city in Korea to plan your curated cultural journey."
+    },
+    "step3": {
+      "title": "How long will you stay?",
+      "description": "Select your visit form and preferred transport mode.",
+      "dayTrip": "Day trip",
+      "stay13": "1-3 days stay",
+      "themeTour": "Theme tour",
+      "visitFormLabel": "Visit Form",
+      "transportLabel": "Preferred Transport Mode",
+      "WALK": "Walk",
+      "TRANSIT": "Public Transit",
+      "CAR": "Car / Taxi"
+    },
+    "step4": {
+      "title": "What interests you?",
+      "description": "Select 1 to 3 interests. You can also specify in your own words.",
+      "history": "History & Heritage",
+      "traditionalMusic": "Traditional Music",
+      "modernArt": "Modern Art",
+      "family": "Family & Kids",
+      "night": "Night View",
+      "wellness": "Wellness & Nature",
+      "food": "K-Food",
+      "festival": "Festivals",
+      "freeTextHint": "Or describe what you want in your own words...",
+      "locationConsent": "Agree to use current location (Optional)",
+      "complete": "Generate Recommendation"
+    }
+  },
+  "package": {
+    "duration": "{hours} hours",
+    "stops": "{count} stops",
+    "swapButton": "Swap this stop",
+    "officialSite": "Official site",
+    "save": "Save itinerary",
+    "share": "Share link",
+    "saved": "Saved",
+    "shareSuccess": "Link copied to clipboard!",
+    "weatherPrompt": "Weather Info",
+    "weatherHintIndoor": "Rainy weather forecasted. Indoor locations recommended.",
+    "weatherHintClear": "Weather is clear. Great day for outdoor activities.",
+    "swapModalTitle": "Swap This Stop",
+    "swapModalDesc": "Choose an alternative location to replace this stop.",
+    "showMoreThemes": "Show more themes"
+  },
+  "ai": {
+    "generatedBadge": "AI-assisted",
+    "officialBadge": "Official",
+    "manualBadge": "Manually curated"
   }
 }
