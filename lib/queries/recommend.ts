@@ -19,7 +19,7 @@ export function useRecommendation(input: RecommendInput) {
       });
       return response;
     },
-    enabled: !!input.cityCode && !!input.visitForm && input.interests.length > 0,
-    staleTime: 5 * 60 * 1000, // 5 minutes cache
+    enabled: !!input.cityCode && !!input.visitForm && (input.interests.length > 0 || (input.freeTextQuery ? input.freeTextQuery.trim().length > 0 : false)),
+    staleTime: 0, // Force fetch on mount instead of aggressive 5 min cache
   });
 }

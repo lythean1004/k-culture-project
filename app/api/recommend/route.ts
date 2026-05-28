@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
+
+export const dynamic = "force-dynamic";
 import crypto from 'crypto';
 import { cache } from '../../../lib/cache';
 import { generateCandidates } from '../../../lib/recommend/candidates';
