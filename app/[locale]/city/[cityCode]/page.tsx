@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useSessionStore } from '@/lib/store/session';
@@ -20,8 +20,7 @@ interface CityPageProps {
   };
 }
 
-export default function CityPage({ params }: CityPageProps) {
-  const { cityCode, locale } = params;
+function CityPageContent({ cityCode, locale }: { cityCode: string, locale: string }) {
   const t = useTranslations('package');
   const tCommon = useTranslations('common');
   const searchParams = useSearchParams();
@@ -170,5 +169,17 @@ export default function CityPage({ params }: CityPageProps) {
 
       <LicenseFooter />
     </div>
+  );
+}
+
+export default function CityPage({ params }: CityPageProps) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <CityPageContent cityCode={params.cityCode} locale={params.locale} />
+    </Suspense>
   );
 }
