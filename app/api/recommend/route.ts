@@ -1,24 +1,131 @@
-import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
+import crypto from 'crypto';
+import { cache } from '../../../lib/cache';
+import { generateCandidates } from '../../../lib/recommend/candidates';
+import { applyFilters } from '../../../lib/recommend/filters';
+import { scoreCandidate } from '../../../lib/recommend/scorer';
+import { aiRerank } from '../../../lib/recommend/ai-rerank';
+import { bundlePackages } from '../../../lib/recommend/bundler';
+import { RecommendContext, RecommendInput, ThemeCode } from '../../../lib/recommend/types';
+import { supabaseAdmin } from '../../../lib/supabase/admin';
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    // Recommendation engine stub
-    return NextResponse.json({
-      success: true,
-      data: {
-        theme: "Heritage & Art Walk",
-        city: body.city || "Seoul",
-        places: [
-          { id: "place-1", name: "Gyeongbokgung Palace", lat: 37.5796, lng: 126.9770 },
-          { id: "place-2", name: "National Museum of Korea", lat: 37.5240, lng: 126.9804 }
-        ],
-        events: [
-          { id: "event-1", title: "Royal Guard Changing Ceremony" }
-        ]
+const RecommendInputSchema = z.object({
+  sessionId: z.string().optional(),
+  cityCode: z.enum(['seoul', 'busan', 'gyeongju', 'jeonju', 'namwon']),
+  visitForm: z.enum(['DAY_TRIP', 'STAY_1_3', 'THEME_TOUR']),
+  interests: z.array(z.string()).max(5),
+  freeTextQuery: z.string().max(200).optional(),
+  lang: z.enum(['en', 'ja', 'zh-Hans', 'zh-Hant']),
+  transportMode: z.enum(['WALK', 'TRANSIT', 'CAR']),
+  currentLocation: z.object({ lat: z.number(), lng: z.number() }).optional(),
+});
+
+function hashInput(input: any): string {
+  const str = JSON.stringify(input);
+  return crypto.createHash('md5').update(str).digest('hex');
+}
+
+async function buildContext(input: any): Promise<RecommendContext> {
+  let weather = 'Clear';
+  const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (hasSupabase) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('weather_snapshots')
+        .select('weather_code')
+        .eq('area_key', input.cityCode)
+        .order('forecast_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+        
+      if (data && data.weather_code) {
+        weather = data.weather_code;
       }
+    } catch (e) {
+      console.warn('[Build Context] Failed to fetch weather snapshot from database:', e);
+    }
+  }
+
+  return {
+    now: new Date(),
+    weather,
+    anchorPlaces: input.currentLocation ? [input.currentLocation] : [],
+  };
+}
+
+async function savePackages(packages: any[], input: any) {
+  const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!hasSupabase) return;
+  
+  for (const pkg of packages) {
+    try {
+      const { data: insertedPkg, error } = await supabaseAdmin
+        .from('packages')
+        .insert({
+          visit_form: input.visitForm,
+          title: pkg.title,
+          summary: pkg.summary,
+          reason_text: pkg.reasonText,
+          lang: input.lang,
+        })
+        .select('package_id')
+        .single();
+        
+      if (error || !insertedPkg) continue;
+
+      const itemsToInsert = pkg.items.map((item: any, idx: number) => ({
+        package_id: insertedPkg.package_id,
+        seq: idx + 1,
+        item_type: item.itemType,
+        ref_id: item.refId,
+        slot_type: item.slotType,
+      }));
+      
+      await supabaseAdmin.from('package_items').insert(itemsToInsert);
+    } catch (e) {
+      console.error('Failed to save packages to Supabase:', e);
+    }
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const input = RecommendInputSchema.parse(body) as unknown as RecommendInput;
+    
+    const cacheKey = `rec:${hashInput(input)}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return Response.json(JSON.parse(cached));
+    }
+    
+    const context = await buildContext(input);
+    const candidates = await generateCandidates(input);
+    const filtered = applyFilters(candidates, input, context);
+    const scored = filtered.map(c => {
+      const score = scoreCandidate(c, input, context);
+      return {
+        ...c,
+        score,
+      };
     });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 });
+    
+    const reranked = await aiRerank(scored, input);
+    const packages = bundlePackages(reranked, input);
+    
+    // Reason text placeholder for step 8
+    for (const pkg of packages) {
+      pkg.reasonText = `Curated for your ${input.visitForm} trip in ${input.cityCode}.`;
+    }
+    
+    const result = { packages };
+    await cache.set(cacheKey, JSON.stringify(result), 300); // 5 minutes cache TTL
+    await savePackages(packages, input);
+    
+    return Response.json(result);
+  } catch (error: any) {
+    return Response.json({ success: false, error: error.message }, { status: 400 });
   }
 }

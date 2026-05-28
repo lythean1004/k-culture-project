@@ -20,21 +20,34 @@ class RedisCache {
 
   async get(key: string): Promise<string | null> {
     if (!this.client) return null;
-    return this.client.get(key);
+    try {
+      return await this.client.get(key);
+    } catch (e) {
+      console.warn('[Cache] Redis is offline. Bypassing get cache.');
+      return null;
+    }
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
     if (!this.client) return;
-    if (ttlSeconds) {
-      await this.client.set(key, value, 'EX', ttlSeconds);
-    } else {
-      await this.client.set(key, value);
+    try {
+      if (ttlSeconds) {
+        await this.client.set(key, value, 'EX', ttlSeconds);
+      } else {
+        await this.client.set(key, value);
+      }
+    } catch (e) {
+      console.warn('[Cache] Redis is offline. Bypassing set cache.');
     }
   }
 
   async del(key: string): Promise<void> {
     if (!this.client) return;
-    await this.client.del(key);
+    try {
+      await this.client.del(key);
+    } catch (e) {
+      console.warn('[Cache] Redis is offline. Bypassing del cache.');
+    }
   }
 }
 
