@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/admin';
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;

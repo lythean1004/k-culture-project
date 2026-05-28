@@ -80,6 +80,10 @@ async function savePackages(packages: any[], input: any) {
         
       if (error || !insertedPkg) continue;
 
+      // CRITICAL FIX: Overwrite the mock packageId with the actual UUID from the database
+      // so the frontend routes to the correct package detail page.
+      pkg.packageId = insertedPkg.package_id;
+
       const itemsToInsert = pkg.items.map((item: any, idx: number) => ({
         package_id: insertedPkg.package_id,
         seq: idx + 1,
