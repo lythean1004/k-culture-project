@@ -48,7 +48,8 @@ export default function PackageDetailPage({ params }: PackageDetailPageProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await ofetch<{ success: boolean; data: any; error?: string }>(`/api/packages/${packageId}`);
+      const cacheBuster = new Date().getTime();
+      const res = await ofetch<{ success: boolean; data: any; error?: string }>(`/api/packages/${packageId}?_t=${cacheBuster}`);
       if (res.success && res.data) {
         setPkg(res.data);
         // Set weather based on city
