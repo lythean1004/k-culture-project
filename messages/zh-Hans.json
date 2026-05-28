@@ -1,0 +1,19 @@
+{
+  "Common": {
+    "title": "K-Culture Curation Platform",
+    "description": "为您量身定制的韩国文化观光推荐套餐。",
+    "selectLanguage": "选择语言",
+    "next": "下一步",
+    "back": "返回"
+  },
+  "Landing": {
+    "welcome": "欢迎来到韩国",
+    "start": "开始"
+  },
+  "Onboarding": {
+    "title": "请选择您的旅行偏好",
+    "selectCity": "您想探索哪个城市？",
+    "selectType": "您的出行方式是？",
+    "selectInterest": "您的兴趣点是什么？"
+  }
+}

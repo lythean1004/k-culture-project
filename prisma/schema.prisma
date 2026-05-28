@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model City {
+  id        String    @id @default(uuid())
+  nameKo    String
+  nameEn    String
+  nameJa    String
+  nameZhCn  String    // en, ja, zh-Hans (zh-Cn), zh-Hant (zh-Tw)
+  nameZhTw  String
+  packages  Package[]
+  places    Place[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Place {
+  id          String   @id @default(uuid())
+  cityId      String
+  city        City     @relation(fields: [cityId], references: [id])
+  nameKo      String
+  nameEn      String
+  nameJa      String
+  nameZhCn    String
+  nameZhTw    String
+  description String?
+  category    String   // museum, art_gallery, attraction, historical, etc.
+  address     String
+  latitude    Float
+  longitude   Float
+  // PostgreSQL PostGIS geometry point mapping
+  // location Unsupported("geometry(Point, 4326)")?
+  externalUrl String?  // 외부 공식 사이트 아웃링크
+  imageUrl    String?
+  source      String   // tourapi, emuseum, odii, etc.
+  sourceId    String   // ID in external API source
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  packages    PlaceOnPackage[]
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  titleKo     String
+  titleEn     String
+  titleJa     String
+  titleZhCn   String
+  titleZhTw   String
+  description String?
+  category    String   // performance, exhibition, festival, etc.
+  startDate   DateTime
+  endDate     DateTime
+  placeName   String
+  latitude    Float?
+  longitude   Float?
+  externalUrl String?
+  imageUrl    String?
+  source      String   // kopis, culture-data, etc.
+  sourceId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Package {
+  id          String   @id @default(uuid())
+  cityId      String
+  city        City     @relation(fields: [cityId], references: [id])
+  themeKo     String
+  themeEn     String
+  themeJa     String
+  themeZhCn   String
+  themeZhTw   String
+  description String?
+  places      PlaceOnPackage[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PlaceOnPackage {
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id])
+  placeId   String
+  place     Place   @relation(fields: [placeId], references: [id])
+  order     Int
+
+  @@id([packageId, placeId])
+}

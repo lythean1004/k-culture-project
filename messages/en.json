@@ -1,0 +1,19 @@
+{
+  "Common": {
+    "title": "K-Culture Curation Platform",
+    "description": "Discover cultural tourism packages tailored just for you.",
+    "selectLanguage": "Select Language",
+    "next": "Next",
+    "back": "Back"
+  },
+  "Landing": {
+    "welcome": "Welcome to Korea",
+    "start": "Get Started"
+  },
+  "Onboarding": {
+    "title": "Tell us about your trip",
+    "selectCity": "Which city do you want to explore?",
+    "selectType": "How are you traveling?",
+    "selectInterest": "What are you interested in?"
+  }
+}
