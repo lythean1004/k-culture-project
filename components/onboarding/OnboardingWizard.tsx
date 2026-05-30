@@ -277,7 +277,7 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
             </button>
           </div>
 
-          <div className="relative h-[360px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/80">
+          <div className="relative h-[430px] sm:h-[480px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/80">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(168,85,247,0.18),transparent_26%),linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,41,59,0.65))]"></div>
             <div className="absolute inset-x-12 top-8 bottom-8 rounded-[42%] border border-slate-700/70 bg-slate-900/40"></div>
             <div className="absolute left-[42%] top-[18%] h-[56%] border-l border-dashed border-slate-600/80 rotate-[16deg]"></div>
@@ -290,21 +290,47 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
                 key={city.code}
                 type="button"
                 onClick={() => handleCitySelect(city.code)}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 min-w-[104px] rounded-xl border px-3 py-2 text-left shadow-lg transition-all ${
+                title={`${city.name} · ${city.nameKo} · ${city.hubLabel}`}
+                aria-label={`Select ${city.name}`}
+                className={`group absolute -translate-x-1/2 -translate-y-1/2 h-9 w-9 rounded-full border shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-purple-300 ${
                   isSelected
-                    ? 'border-purple-400 bg-purple-600/25 text-white shadow-purple-500/20'
-                    : 'border-slate-700 bg-slate-950/90 text-slate-300 hover:border-slate-500'
+                    ? 'z-20 scale-110 border-purple-300 bg-purple-500 text-white shadow-purple-500/30'
+                    : 'z-10 border-slate-600 bg-slate-950/90 text-slate-300 hover:z-20 hover:border-slate-300 hover:bg-slate-800'
                 }`}
                 style={{ left: `${city.mapX}%`, top: `${city.mapY}%` }}
               >
-                <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-pink-300' : 'bg-slate-500'}`}></span>
-                  <div>
-                    <h4 className="font-bold text-sm">{city.name}</h4>
-                    <p className="text-[10px] text-slate-400">{city.nameKo} · {city.hubLabel}</p>
-                  </div>
-                </div>
+                <MapPin className="m-auto h-4 w-4" />
+                <span
+                  className={`pointer-events-none absolute left-1/2 top-10 -translate-x-1/2 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] font-bold shadow-xl transition-opacity ${
+                    isSelected
+                      ? 'border-purple-400 bg-slate-950 text-purple-100 opacity-100'
+                      : 'border-slate-700 bg-slate-950 text-slate-200 opacity-0 group-hover:opacity-100'
+                  }`}
+                >
+                  {city.name}
+                </span>
               </button>
+              );
+            })}
+          </div>
+
+          <div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-6">
+            {cityList.map((city) => {
+              const isSelected = selectedCities.includes(city.code);
+              return (
+                <button
+                  key={city.code}
+                  type="button"
+                  onClick={() => handleCitySelect(city.code)}
+                  className={`rounded-lg border px-3 py-2 text-left transition ${
+                    isSelected
+                      ? 'border-purple-400 bg-purple-600/20 text-purple-100'
+                      : 'border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <span className="block text-xs font-bold">{city.name}</span>
+                  <span className="block truncate text-[10px] text-slate-500">{city.nameKo} · {city.hubLabel}</span>
+                </button>
               );
             })}
           </div>

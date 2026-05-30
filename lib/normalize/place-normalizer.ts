@@ -4,16 +4,32 @@ import { NormalizedPlace } from '../sources/_types';
 
 async function resolveCityId(normalized: NormalizedPlace): Promise<string> {
   let cityCode = 'seoul';
-  const addr = normalized.addrKo || '';
-  
-  if (addr.includes('부산')) {
-    cityCode = 'busan';
-  } else if (addr.includes('경주')) {
-    cityCode = 'gyeongju';
-  } else if (addr.includes('전주')) {
-    cityCode = 'jeonju';
-  } else if (addr.includes('남원')) {
-    cityCode = 'namwon';
+  const lookupText = `${normalized.addrKo || ''} ${normalized.nameKo || ''}`;
+  const cityKeywords: Array<[string, string[]]> = [
+    ['incheon', ['인천', '영종', '차이나타운', 'Incheon', 'Yeongjong']],
+    ['suwon', ['수원', 'Suwon']],
+    ['sokcho', ['속초', '설악', 'Sokcho', 'Seorak']],
+    ['gangneung', ['강릉', '주문진', '경포', 'Gangneung', 'Jumunjin', 'Gyeongpo']],
+    ['daejeon', ['대전', 'Daejeon']],
+    ['andong', ['안동', '하회', '도산서원', 'Andong', 'Hahoe']],
+    ['daegu', ['대구', 'Daegu']],
+    ['busan', ['부산', '해운대', '광안리', 'Busan', 'Haeundae', 'Gwangalli']],
+    ['gyeongju', ['경주', '불국사', '첨성대', 'Gyeongju', 'Bulguksa']],
+    ['ulsan', ['울산', 'Ulsan']],
+    ['jeonju', ['전주', 'Jeonju']],
+    ['namwon', ['남원', 'Namwon']],
+    ['gwangju', ['광주', 'Gwangju']],
+    ['mokpo', ['목포', 'Mokpo']],
+    ['yeosu', ['여수', 'Yeosu']],
+    ['tongyeong', ['통영', 'Tongyeong']],
+    ['jeju', ['제주', 'Jeju']],
+  ];
+  const matchedCity = cityKeywords.find(([, keywords]) =>
+    keywords.some(keyword => lookupText.includes(keyword))
+  );
+
+  if (matchedCity) {
+    cityCode = matchedCity[0];
   }
 
   const { data } = await supabaseAdmin

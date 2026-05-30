@@ -6,6 +6,7 @@ import { bundlePackages } from '../../lib/recommend/bundler';
 import { RecommendContext, RecommendInput } from '../../lib/recommend/types';
 import { GET as getPackageDetails } from '../../app/api/packages/[packageId]/route';
 import { NextRequest } from 'next/server';
+import { CITY_OPTIONS, normalizeCityCodes } from '../../lib/recommend/cities';
 
 const originalSupabaseUrl = process.env.SUPABASE_URL;
 const originalSupabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -77,6 +78,44 @@ describe('recommendation city scoping', () => {
     expect(candidates.every(candidate => candidate.cityCode === 'gyeongju')).toBe(true);
   });
 
+  it('supports requested new travel regions without falling back to Seoul', async () => {
+    const expectedByCity = {
+      incheon: ['인천 차이나타운', '영종도 마시안해변'],
+      gangneung: ['안목해변 커피거리', '오죽헌'],
+      jeju: ['성산일출봉', '동문시장'],
+      andong: ['하회마을', '도산서원'],
+    };
+
+    for (const [cityCode, expectedNames] of Object.entries(expectedByCity)) {
+      const candidates = await generateCandidates(makeInput(cityCode));
+      const names = candidates.map(candidate => candidate.nameKo);
+
+      expectedNames.forEach(name => expect(names).toContain(name));
+      expect(names).not.toContain('경복궁');
+      expect(names).not.toContain('국립중앙박물관');
+      expect(candidates.every(candidate => candidate.cityCode === cityCode)).toBe(true);
+    }
+  });
+
+  it('has city-specific fallback candidates for every mapped travel hub', async () => {
+    for (const city of CITY_OPTIONS) {
+      const candidates = await generateCandidates(makeInput(city.code));
+      const names = candidates.map(candidate => candidate.nameKo);
+
+      expect(candidates.length).toBeGreaterThan(0);
+      expect(candidates.every(candidate => candidate.cityCode === city.code)).toBe(true);
+      if (city.code !== 'seoul') {
+        expect(names).not.toContain('경복궁');
+        expect(names).not.toContain('국립중앙박물관');
+      }
+    }
+  });
+
+  it('ignores unknown secondary city codes instead of injecting Seoul into a valid scope', () => {
+    expect(normalizeCityCodes('busan', ['busan', 'unknown-city'])).toEqual(['busan']);
+    expect(normalizeCityCodes('incheon', ['unknown-city'])).toEqual(['incheon']);
+  });
+
   it('builds Busan packages only from Busan items', async () => {
     const input = makeInput('busan');
     const context: RecommendContext = {
@@ -125,6 +164,36 @@ describe('recommendation city scoping', () => {
     expect(firstPackage.items.every(item => item.dayNumber === 1 || item.dayNumber === 2)).toBe(true);
     expect(itemNames).toContain('부산박물관');
     expect(itemNames).toContain('불국사');
+    expect(itemNames).not.toContain('경복궁');
+    expect(itemNames).not.toContain('국립중앙박물관');
+  });
+
+  it('builds requested new regions into day-by-day multi-region courses', async () => {
+    const input = makeMultiInput(['incheon', 'gangneung', 'jeju'], 'THEME_TOUR');
+    input.interests = ['FOOD'];
+    const context: RecommendContext = {
+      now: new Date('2026-05-30T12:00:00+09:00'),
+      weather: 'Clear',
+      anchorPlaces: [],
+    };
+
+    const candidates = await generateCandidates(input);
+    const filtered = applyFilters(candidates, input, context);
+    const scored = filtered.map(candidate => ({
+      ...candidate,
+      score: scoreCandidate(candidate, input, context),
+    }));
+    const packages = bundlePackages(scored, input);
+    const firstPackage = packages[0];
+    const itemCityCodes = new Set(firstPackage.items.map(item => item.cityCode));
+    const itemNames = firstPackage.items.map(item => item.nameKo || item.name);
+
+    expect(firstPackage.dayCount).toBe(3);
+    expect(firstPackage.cityCodes).toEqual(['incheon', 'gangneung', 'jeju']);
+    expect(itemCityCodes).toEqual(new Set(['incheon', 'gangneung', 'jeju']));
+    expect(itemNames).toContain('인천 차이나타운');
+    expect(itemNames).toContain('안목해변 커피거리');
+    expect(itemNames).toContain('동문시장');
     expect(itemNames).not.toContain('경복궁');
     expect(itemNames).not.toContain('국립중앙박물관');
   });

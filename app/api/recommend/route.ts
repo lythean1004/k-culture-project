@@ -12,14 +12,14 @@ import { bundlePackages } from '../../../lib/recommend/bundler';
 import { generateReasonText } from '../../../lib/recommend/reason';
 import { RecommendContext, RecommendInput, ThemeCode } from '../../../lib/recommend/types';
 import { supabaseAdmin } from '../../../lib/supabase/admin';
-import { dayCountFromVisitForm, normalizeCityCodes, visitFormFromDayCount } from '../../../lib/recommend/cities';
+import { CITY_CODE_VALUES, dayCountFromVisitForm, normalizeCityCodes, visitFormFromDayCount } from '../../../lib/recommend/cities';
 
 const NULL_UUID = '00000000-0000-0000-0000-000000000000';
 
 const RecommendInputSchema = z.object({
   sessionId: z.string().optional(),
-  cityCode: z.enum(['seoul', 'busan', 'gyeongju', 'jeonju', 'namwon']),
-  cityCodes: z.array(z.enum(['seoul', 'busan', 'gyeongju', 'jeonju', 'namwon'])).max(3).optional(),
+  cityCode: z.enum(CITY_CODE_VALUES),
+  cityCodes: z.array(z.enum(CITY_CODE_VALUES)).max(3).optional(),
   tripDays: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   visitForm: z.enum(['DAY_TRIP', 'STAY_1_3', 'THEME_TOUR']),
   interests: z.array(z.string()).max(5),
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
     } as unknown as RecommendInput;
     
     // Bump version when recommendation composition rules change.
-    const cacheKey = `rec:v7:${hashInput(input)}`;
+    const cacheKey = `rec:v8:${hashInput(input)}`;
     const cached = await cache.get(cacheKey);
     if (cached) {
       return Response.json(JSON.parse(cached));
