@@ -1,185 +1,145 @@
 import { RecommendedPackage, ScoredCandidate, RecommendInput, PackageItem, ThemeCode } from './types';
+import { cityScopeSlug, dayCountFromVisitForm, formatCityScope, normalizeCityCodes } from './cities';
+
+const DAY_SLOTS: PackageItem['slotType'][] = ['MORNING', 'LUNCH', 'AFTERNOON', 'EVENING'];
 
 export function bundlePackages(
   scored: ScoredCandidate[],
   input: RecommendInput
 ): RecommendedPackage[] {
-  switch (input.visitForm) {
-    case 'DAY_TRIP':
-      return bundleDayTrip(scored, input);
-    case 'STAY_1_3':
-      return bundleStay(scored, input);
-    case 'THEME_TOUR':
-      return bundleThemeTour(scored, input);
-    default:
-      return bundleDayTrip(scored, input);
-  }
+  return bundleCourseItineraries(scored, input);
 }
 
-function bundleDayTrip(scored: ScoredCandidate[], input: RecommendInput): RecommendedPackage[] {
+function bundleCourseItineraries(scored: ScoredCandidate[], input: RecommendInput): RecommendedPackage[] {
   const themes = input.interests.length > 0 ? input.interests : ['HISTORY' as ThemeCode];
+  const selectedCityCodes = normalizeCityCodes(input.cityCode, input.cityCodes);
+  const dayCount = Math.max(
+    dayCountFromVisitForm(input.visitForm, input.tripDays),
+    Math.min(selectedCityCodes.length, 3)
+  ) as 1 | 2 | 3;
+  const scopeLabel = formatCityScope(selectedCityCodes).toUpperCase();
+  const scopeSlug = cityScopeSlug(selectedCityCodes);
   const packages: RecommendedPackage[] = [];
 
   themes.forEach((theme, index) => {
-    const themePlaces = scored.filter(c => c.entityType === 'PLACE' && c.themes.includes(theme));
-    const themeEvents = scored.filter(c => c.entityType === 'EVENT');
-
-    if (themePlaces.length === 0) return;
-
+    const usedKeys = new Set<string>();
     const items: PackageItem[] = [];
-    
-    // Anchor place (morning slot)
-    const anchor = themePlaces[0];
-    items.push({
-      id: `item-${anchor.id}-morning`,
-      itemType: 'PLACE',
-      refId: anchor.id,
-      name: anchor.nameKo,
-      lat: anchor.lat,
-      lng: anchor.lng,
-      slotType: 'MORNING',
-      nameKo: anchor.nameKo,
-      nameI18n: anchor.nameI18n,
-      primaryType: anchor.primaryType,
-    });
 
-    // Sub place (afternoon slot)
-    const sub = themePlaces[1] || scored.find(c => c.entityType === 'PLACE' && c.id !== anchor.id);
-    if (sub) {
-      items.push({
-        id: `item-${sub.id}-afternoon`,
-        itemType: 'PLACE',
-        refId: sub.id,
-        name: sub.nameKo,
-        lat: sub.lat,
-        lng: sub.lng,
-        slotType: 'AFTERNOON',
-        nameKo: sub.nameKo,
-        nameI18n: sub.nameI18n,
-        primaryType: sub.primaryType,
+    for (let day = 1; day <= dayCount; day += 1) {
+      const cityCode = selectedCityCodes[(day - 1) % selectedCityCodes.length];
+      const dayCandidates = selectDayCandidates(scored, theme, cityCode, usedKeys);
+
+      dayCandidates.forEach((candidate, slotIndex) => {
+        usedKeys.add(candidateKey(candidate));
+        items.push(candidateToPackageItem(candidate, day, DAY_SLOTS[slotIndex] || 'EVENING'));
       });
     }
 
-    // Event/Performance (evening slot)
-    const event = themeEvents[0] || scored.find(c => c.entityType === 'EVENT');
-    if (event) {
-      items.push({
-        id: `item-${event.id}-evening`,
-        itemType: 'EVENT',
-        refId: event.id,
-        name: event.nameKo,
-        lat: event.lat,
-        lng: event.lng,
-        slotType: 'EVENING',
-        nameKo: event.nameKo,
-        nameI18n: event.nameI18n,
-        primaryType: event.primaryType,
-      });
-    }
+    if (items.length === 0) return;
+
+    const firstScored = scored.find(candidate => candidate.id === items[0].refId);
+    const totalScore = items.reduce((acc, item) => {
+      const candidateScore = scored.find(candidate => candidate.id === item.refId)?.score.total || 0;
+      return acc + candidateScore;
+    }, 0);
 
     packages.push({
-      packageId: `pkg-day-${input.cityCode}-${theme.toLowerCase()}-${index}`,
+      packageId: `pkg-${dayCount}d-${scopeSlug}-${theme.toLowerCase()}-${index}`,
       themeCode: theme,
-      title: `${theme} Curated One-Day Course`,
-      summary: `A special day course focusing on ${theme} in ${input.cityCode.toUpperCase()}.`,
+      title: `${dayCount}-Day ${theme} Course in ${scopeLabel}`,
+      summary: buildCourseSummary(dayCount, selectedCityCodes),
       reasonText: `Customized for your interest in ${theme}.`,
       items,
-      totalScore: anchor.score.total + (sub ? sub.score.total : 0) + (event ? event.score.total : 0),
-      scoreBreakdown: anchor.score.breakdown,
-      cityName: input.cityCode.toUpperCase(),
-      durationHours: 8,
+      totalScore,
+      scoreBreakdown: firstScored?.score.breakdown || scored[0]?.score.breakdown,
+      cityName: scopeLabel,
+      cityCodes: selectedCityCodes,
+      dayCount,
+      routeLabel: buildRouteLabel(dayCount, selectedCityCodes),
+      durationHours: dayCount * 8,
     });
   });
 
   return packages.slice(0, 5);
 }
 
-function bundleStay(scored: ScoredCandidate[], input: RecommendInput): RecommendedPackage[] {
-  const packages: RecommendedPackage[] = [];
-  const themes = input.interests.length > 0 ? input.interests : ['HISTORY' as ThemeCode];
+function selectDayCandidates(
+  scored: ScoredCandidate[],
+  theme: ThemeCode,
+  cityCode: string,
+  usedKeys: Set<string>
+): ScoredCandidate[] {
+  const cityCandidates = scored.filter(candidate => candidate.cityCode === cityCode);
+  const themedPlaces = cityCandidates.filter(candidate =>
+    candidate.entityType === 'PLACE' &&
+    candidate.themes.includes(theme) &&
+    !usedKeys.has(candidateKey(candidate))
+  );
+  const restaurants = cityCandidates.filter(candidate =>
+    candidate.entityType === 'PLACE' &&
+    candidate.themes.includes('FOOD') &&
+    !usedKeys.has(candidateKey(candidate))
+  );
+  const events = cityCandidates.filter(candidate =>
+    candidate.entityType === 'EVENT' &&
+    !usedKeys.has(candidateKey(candidate))
+  );
+  const fallbackPlaces = cityCandidates.filter(candidate =>
+    candidate.entityType === 'PLACE' &&
+    !usedKeys.has(candidateKey(candidate))
+  );
+  const selected: ScoredCandidate[] = [];
 
-  themes.forEach((theme, index) => {
-    const themePlaces = scored.filter(c => c.entityType === 'PLACE' && c.themes.includes(theme));
-    if (themePlaces.length < 2) return;
+  pickNext(selected, themedPlaces);
+  pickNext(selected, restaurants, fallbackPlaces);
+  pickNext(selected, themedPlaces, fallbackPlaces);
+  pickNext(selected, events, themedPlaces, fallbackPlaces);
 
-    const items: PackageItem[] = [
-      {
-        id: `item-${themePlaces[0].id}-d1-morning`,
-        itemType: 'PLACE',
-        refId: themePlaces[0].id,
-        name: themePlaces[0].nameKo,
-        lat: themePlaces[0].lat,
-        lng: themePlaces[0].lng,
-        slotType: 'MORNING',
-        nameKo: themePlaces[0].nameKo,
-        nameI18n: themePlaces[0].nameI18n,
-        primaryType: themePlaces[0].primaryType,
-      },
-      {
-        id: `item-${themePlaces[1].id}-d2-afternoon`,
-        itemType: 'PLACE',
-        refId: themePlaces[1].id,
-        name: themePlaces[1].nameKo,
-        lat: themePlaces[1].lat,
-        lng: themePlaces[1].lng,
-        slotType: 'AFTERNOON',
-        nameKo: themePlaces[1].nameKo,
-        nameI18n: themePlaces[1].nameI18n,
-        primaryType: themePlaces[1].primaryType,
-      }
-    ];
-
-    packages.push({
-      packageId: `pkg-stay-${input.cityCode}-${theme.toLowerCase()}-${index}`,
-      themeCode: theme,
-      title: `${theme} Weekend Stay in ${input.cityCode.toUpperCase()}`,
-      summary: `Relaxing staying itinerary exploring ${theme}.`,
-      reasonText: `Curated stay for ${theme} lovers.`,
-      items,
-      totalScore: themePlaces[0].score.total + themePlaces[1].score.total,
-      scoreBreakdown: themePlaces[0].score.breakdown,
-      cityName: input.cityCode.toUpperCase(),
-      durationHours: 36,
-    });
-  });
-
-  return packages.slice(0, 3);
+  return selected.slice(0, DAY_SLOTS.length);
 }
 
-function bundleThemeTour(scored: ScoredCandidate[], input: RecommendInput): RecommendedPackage[] {
-  const packages: RecommendedPackage[] = [];
-  const themes = input.interests.length > 0 ? input.interests : ['HISTORY' as ThemeCode];
+function pickNext(selected: ScoredCandidate[], ...pools: ScoredCandidate[][]): void {
+  for (const pool of pools) {
+    const candidate = pool.find(item => !selected.some(selectedItem => candidateKey(selectedItem) === candidateKey(item)));
+    if (candidate) {
+      selected.push(candidate);
+      return;
+    }
+  }
+}
 
-  themes.forEach((theme, index) => {
-    const themePlaces = scored.filter(c => c.entityType === 'PLACE' && c.themes.includes(theme));
-    if (themePlaces.length === 0) return;
+function candidateToPackageItem(candidate: ScoredCandidate, dayNumber: number, slotType: PackageItem['slotType']): PackageItem {
+  return {
+    id: `item-${candidate.id}-d${dayNumber}-${slotType.toLowerCase()}`,
+    itemType: candidate.entityType,
+    refId: candidate.id,
+    name: candidate.nameKo,
+    dayNumber,
+    cityCode: candidate.cityCode,
+    lat: candidate.lat,
+    lng: candidate.lng,
+    slotType,
+    nameKo: candidate.nameKo,
+    nameI18n: candidate.nameI18n,
+    primaryType: candidate.primaryType,
+    source: candidate.source,
+  };
+}
 
-    const items: PackageItem[] = themePlaces.slice(0, 4).map((p, idx) => ({
-      id: `item-${p.id}-slot-${idx}`,
-      itemType: 'PLACE',
-      refId: p.id,
-      name: p.nameKo,
-      lat: p.lat,
-      lng: p.lng,
-      slotType: idx === 0 ? 'MORNING' : idx === 1 ? 'LUNCH' : idx === 2 ? 'AFTERNOON' : 'EVENING',
-      nameKo: p.nameKo,
-      nameI18n: p.nameI18n,
-      primaryType: p.primaryType,
-    }));
+function candidateKey(candidate: ScoredCandidate): string {
+  return `${candidate.entityType}:${candidate.id}`;
+}
 
-    packages.push({
-      packageId: `pkg-theme-${input.cityCode}-${theme.toLowerCase()}-${index}`,
-      themeCode: theme,
-      title: `Deep Dive: ${theme} Tour`,
-      summary: `An intensive historical/cultural deep-dive package.`,
-      reasonText: `Specifically optimized for ${theme} theme.`,
-      items,
-      totalScore: items.reduce((acc, curr) => acc + (scored.find(s => s.id === curr.refId)?.score.total || 0), 0),
-      scoreBreakdown: themePlaces[0].score.breakdown,
-      cityName: input.cityCode.toUpperCase(),
-      durationHours: 12,
-    });
+function buildCourseSummary(dayCount: number, cityCodes: string[]): string {
+  const cityList = formatCityScope(cityCodes);
+  return `${dayCount} concrete day-by-day route covering ${cityList}.`;
+}
+
+function buildRouteLabel(dayCount: number, cityCodes: string[]): string {
+  const dayCities = Array.from({ length: dayCount }, (_, index) => {
+    const cityCode = cityCodes[index % cityCodes.length];
+    return `Day ${index + 1}: ${formatCityScope([cityCode])}`;
   });
 
-  return packages.slice(0, 3);
+  return dayCities.join(' / ');
 }

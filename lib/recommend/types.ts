@@ -13,6 +13,8 @@ export type VisitForm = 'DAY_TRIP' | 'STAY_1_3' | 'THEME_TOUR';
 export interface RecommendInput {
   sessionId?: string;
   cityCode: string;
+  cityCodes?: string[];
+  tripDays?: 1 | 2 | 3;
   visitForm: VisitForm;
   interests: ThemeCode[];
   freeTextQuery?: string;          // 자유 텍스트 입력 (임베딩 매칭용)
@@ -82,12 +84,15 @@ export interface PackageItem {
   itemType: 'PLACE' | 'EVENT';
   refId: string;
   name: string;
+  dayNumber?: number;
+  cityCode?: string;
   lat?: number;
   lng?: number;
   slotType: 'MORNING' | 'LUNCH' | 'AFTERNOON' | 'EVENING' | 'NIGHT';
   nameKo?: string;
   nameI18n?: Record<string, string>;
   primaryType?: string;
+  source?: string;
 }
 
 export interface RecommendedPackage {
@@ -101,6 +106,9 @@ export interface RecommendedPackage {
   scoreBreakdown: ScoreBreakdown;
   weatherFallback?: PackageItem[];
   cityName?: string;
+  cityCodes?: string[];
+  dayCount?: number;
+  routeLabel?: string;
   durationHours?: number;
   reasonTextSource?: 'LLM_GENERATED' | 'TEMPLATE_FALLBACK';
 }

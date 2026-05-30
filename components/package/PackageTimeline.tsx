@@ -55,9 +55,11 @@ export default function PackageTimeline({ pkg, sessionId, onUpdateItems, onHover
       name: newItem.name,
       nameKo: newItem.nameKo || newItem.name,
       nameI18n: newItem.nameI18n,
+      cityCode: newItem.cityCode || newItems[swapIndex].cityCode,
       lat: newItem.lat,
       lng: newItem.lng,
       primaryType: newItem.primaryType,
+      source: newItem.source,
     };
 
     onUpdateItems(newItems);
@@ -83,6 +85,8 @@ export default function PackageTimeline({ pkg, sessionId, onUpdateItems, onHover
         const slotText = timeSlots[item.slotType] || item.slotType;
         const displayName = item.name;
         const nameKo = item.nameKo || item.name;
+        const dayNumber = item.dayNumber || 1;
+        const showDayHeader = idx === 0 || (pkg.items[idx - 1]?.dayNumber || 1) !== dayNumber;
 
         return (
           <div
@@ -91,8 +95,20 @@ export default function PackageTimeline({ pkg, sessionId, onUpdateItems, onHover
             onMouseLeave={() => onHoverItem && onHoverItem(null)}
             className="relative group transition-all duration-300"
           >
+            {showDayHeader && (
+              <div className="mb-4 -ml-6 flex items-center gap-2">
+                <span className="rounded-lg border border-purple-500/30 bg-purple-600/15 px-3 py-1 text-xs font-bold text-purple-200">
+                  Day {dayNumber}
+                </span>
+                {item.cityCode && (
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    {item.cityCode}
+                  </span>
+                )}
+              </div>
+            )}
             {/* Timeline dot marker */}
-            <span className="absolute -left-[35px] top-1.5 w-4 h-4 rounded-full bg-slate-950 border-2 border-purple-500 flex items-center justify-center group-hover:scale-125 transition-transform duration-300 shadow-[0_0_8px_rgba(168,85,247,0.4)]">
+            <span className={`absolute -left-[35px] ${showDayHeader ? 'top-12' : 'top-1.5'} w-4 h-4 rounded-full bg-slate-950 border-2 border-purple-500 flex items-center justify-center group-hover:scale-125 transition-transform duration-300 shadow-[0_0_8px_rgba(168,85,247,0.4)]`}>
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
             </span>
 
@@ -101,7 +117,7 @@ export default function PackageTimeline({ pkg, sessionId, onUpdateItems, onHover
               {/* Top row */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span className="text-xs font-mono font-bold text-purple-400 tracking-wider">
-                  🕒 {slotText} (Stop {idx + 1})
+                  🕒 Day {dayNumber} · {slotText} (Stop {idx + 1})
                 </span>
                 <div className="flex items-center gap-2">
                   <TranslationBadge grade="A" source="OFFICIAL_HUMAN" />
@@ -152,7 +168,7 @@ export default function PackageTimeline({ pkg, sessionId, onUpdateItems, onHover
       {/* Swap Modal Container */}
       <SwapModal
         packageId={pkg.packageId}
-        cityCode={pkg.cityName?.toLowerCase()}
+        cityCode={swapIndex !== null ? pkg.items[swapIndex]?.cityCode || pkg.cityCodes?.[0] : pkg.cityCodes?.[0]}
         itemIndex={swapIndex !== null ? swapIndex : 0}
         isOpen={swapIndex !== null}
         onClose={() => setSwapIndex(null)}

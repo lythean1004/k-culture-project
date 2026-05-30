@@ -1,4 +1,5 @@
 import { Candidate, RecommendContext, RecommendInput } from './types';
+import { normalizeCityCodes } from './cities';
 
 const MAX_DISTANCE_BY_MODE: Record<'WALK' | 'TRANSIT' | 'CAR', number> = {
   WALK: 2.0,      // 2km
@@ -37,12 +38,15 @@ export function applyFilters(
   input: RecommendInput,
   context: RecommendContext
 ): Candidate[] {
+  const selectedCityCodes = normalizeCityCodes(input.cityCode, input.cityCodes);
+  const isMultiCity = selectedCityCodes.length > 1;
+
   return candidates.filter(c => {
     // 1. Operating hours check
     if (!isOperatingNow(c, context.now)) return false;
     
     // 2. Transport mode distance boundary check
-    if (input.currentLocation && c.lat && c.lng) {
+    if (!isMultiCity && input.currentLocation && c.lat && c.lng) {
       const dist = haversine(input.currentLocation, { lat: c.lat, lng: c.lng });
       const maxDist = MAX_DISTANCE_BY_MODE[input.transportMode];
       if (dist > maxDist) return false;

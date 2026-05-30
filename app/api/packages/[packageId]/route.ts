@@ -2,10 +2,10 @@ import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/admin';
 import { getCityMockData } from '../../../../lib/recommend/candidates';
 import { ThemeCode } from '../../../../lib/recommend/types';
+import { CITY_OPTIONS, dayCountFromVisitForm, formatCityScope, normalizeCityCode, normalizeCityCodes } from '../../../../lib/recommend/cities';
 
 export const dynamic = "force-dynamic";
 
-const CITY_CODES = ['seoul', 'busan', 'gyeongju', 'jeonju', 'namwon'];
 const THEME_CODES: ThemeCode[] = [
   'HISTORY',
   'TRADITIONAL_MUSIC',
@@ -17,13 +17,10 @@ const THEME_CODES: ThemeCode[] = [
   'FESTIVAL',
 ];
 
-function normalizeCityCode(value?: string | null): string {
-  const normalized = value?.toLowerCase();
-  return normalized && CITY_CODES.includes(normalized) ? normalized : 'seoul';
-}
-
-function inferCityFromPackageId(packageId: string): string | undefined {
-  return CITY_CODES.find(cityCode => packageId.includes(`-${cityCode}-`));
+function inferCitiesFromPackageId(packageId: string): string[] {
+  return CITY_OPTIONS
+    .map(city => city.code)
+    .filter(cityCode => packageId.includes(`-${cityCode}`) || packageId.includes(`${cityCode}-`));
 }
 
 function inferThemeFromPackageId(packageId: string): ThemeCode {
@@ -35,6 +32,38 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function inferDayCountFromPackageId(packageId: string, cityCount: number): 1 | 2 | 3 {
+  const match = packageId.match(/pkg-(\d)d-/);
+  if (match?.[1] === '2' || match?.[1] === '3') return Number(match[1]) as 2 | 3;
+  return Math.max(1, Math.min(cityCount, 3)) as 1 | 2 | 3;
+}
+
+function buildRouteLabel(dayCount: number, cityCodes: string[]): string {
+  return Array.from({ length: dayCount }, (_, index) => {
+    const cityCode = cityCodes[index % cityCodes.length];
+    return `Day ${index + 1}: ${formatCityScope([cityCode])}`;
+  }).join(' / ');
+}
+
+function parseDayNumber(value?: string | null): number | undefined {
+  const match = value?.match(/^day:(\d+)$/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function selectLocalDayCandidates(cityCode: string, themeCode: ThemeCode) {
+  const cityCandidates = getCityMockData(cityCode);
+  const themed = cityCandidates.filter(candidate => candidate.themes.includes(themeCode));
+  const food = cityCandidates.filter(candidate => candidate.themes.includes('FOOD'));
+  const selected = [] as ReturnType<typeof getCityMockData>;
+
+  for (const pool of [themed, food, themed, cityCandidates]) {
+    const candidate = pool.find(item => !selected.some(selectedItem => selectedItem.id === item.id));
+    if (candidate) selected.push(candidate);
+  }
+
+  return selected.slice(0, 4);
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { packageId: string } }
@@ -42,39 +71,53 @@ export async function GET(
   try {
     const { packageId } = params;
     const { searchParams } = new URL(req.url);
-    const requestedCityCode = normalizeCityCode(searchParams.get('city') || inferCityFromPackageId(packageId));
+    const requestedCityCodes = searchParams.get('cities')
+      ? normalizeCityCodes(undefined, searchParams.get('cities')?.split(','))
+      : normalizeCityCodes(searchParams.get('city') || normalizeCityCode(inferCitiesFromPackageId(packageId)[0]), inferCitiesFromPackageId(packageId));
+    const requestedCityCode = requestedCityCodes[0];
 
     const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!hasSupabase || !isUuid(packageId)) {
       const themeCode = inferThemeFromPackageId(packageId);
-      const cityCandidates = getCityMockData(requestedCityCode);
-      const themedCandidates = cityCandidates.filter(candidate => candidate.themes.includes(themeCode));
-      const selectedCandidates = themedCandidates.length > 0 ? themedCandidates : cityCandidates;
+      const dayCount = inferDayCountFromPackageId(packageId, requestedCityCodes.length);
       const slotTypes = ['MORNING', 'LUNCH', 'AFTERNOON', 'EVENING'] as const;
+      const items = Array.from({ length: dayCount }, (_, dayIndex) => {
+        const cityCode = requestedCityCodes[dayIndex % requestedCityCodes.length];
+        const selectedCandidates = selectLocalDayCandidates(cityCode, themeCode);
+
+        return selectedCandidates.slice(0, 4).map((candidate, slotIndex) => ({
+          id: `item-${candidate.id}-d${dayIndex + 1}-${slotIndex}`,
+          itemType: candidate.entityType,
+          refId: candidate.id,
+          name: candidate.nameI18n?.en || candidate.nameKo,
+          nameKo: candidate.nameKo,
+          nameI18n: candidate.nameI18n,
+          cityCode,
+          dayNumber: dayIndex + 1,
+          lat: candidate.lat,
+          lng: candidate.lng,
+          slotType: slotTypes[slotIndex] || 'EVENING',
+          primaryType: candidate.primaryType,
+          source: candidate.source,
+        }));
+      }).flat();
+      const cityScopeName = formatCityScope(requestedCityCodes).toUpperCase();
 
       return Response.json({
         success: true,
         data: {
           packageId,
           themeCode,
-          title: `${themeCode} Route in ${requestedCityCode.toUpperCase()}`,
-          summary: `A city-specific cultural route built from ${requestedCityCode.toUpperCase()} places.`,
-          reasonText: `Curated from ${requestedCityCode.toUpperCase()} candidates only.`,
+          title: `${dayCount}-Day ${themeCode} Course in ${cityScopeName}`,
+          summary: `${dayCount} concrete day-by-day route covering ${formatCityScope(requestedCityCodes)}.`,
+          reasonText: `Curated from ${cityScopeName} candidates only.`,
           reasonTextSource: 'TEMPLATE_FALLBACK',
-          cityName: requestedCityCode.toUpperCase(),
-          durationHours: 8,
-          items: selectedCandidates.slice(0, 4).map((candidate, index) => ({
-            id: `item-${candidate.id}-${index}`,
-            itemType: candidate.entityType,
-            refId: candidate.id,
-            name: candidate.nameI18n?.en || candidate.nameKo,
-            nameKo: candidate.nameKo,
-            nameI18n: candidate.nameI18n,
-            lat: candidate.lat,
-            lng: candidate.lng,
-            slotType: slotTypes[index] || 'EVENING',
-            primaryType: candidate.primaryType,
-          })),
+          cityName: cityScopeName,
+          cityCodes: requestedCityCodes,
+          dayCount,
+          routeLabel: buildRouteLabel(dayCount, requestedCityCodes),
+          durationHours: dayCount * 8,
+          items,
         },
       });
     }
@@ -93,7 +136,7 @@ export async function GET(
     // 2. Fetch package items ordered by seq
     const { data: items, error: itemsError } = await supabaseAdmin
       .from('package_items')
-      .select('id, seq, item_type, ref_id, slot_type')
+      .select('id, seq, item_type, ref_id, slot_type, replacement_group')
       .eq('package_id', packageId)
       .order('seq', { ascending: true });
 
@@ -105,16 +148,11 @@ export async function GET(
     const resolvedItems = [];
     for (const item of (items || [])) {
       if (item.item_type === 'PLACE') {
-        let placeQuery = supabaseAdmin
+        const { data: place } = await supabaseAdmin
           .from('places')
-          .select('name_ko, lat, lng, primary_type, place_i18n(lang, name)')
-          .eq('place_id', item.ref_id);
-
-        if (pkg.city_id) {
-          placeQuery = placeQuery.eq('city_id', pkg.city_id);
-        }
-
-        const { data: place } = await placeQuery.maybeSingle();
+          .select('name_ko, lat, lng, primary_type, cities(code), place_i18n(lang, name)')
+          .eq('place_id', item.ref_id)
+          .maybeSingle();
 
         const nameI18n: Record<string, string> = {};
         if (place && Array.isArray(place.place_i18n)) {
@@ -130,22 +168,19 @@ export async function GET(
           name: place?.name_ko || 'Unknown Place',
           nameKo: place?.name_ko || 'Unknown Place',
           nameI18n,
+          cityCode: (Array.isArray(place?.cities) ? place?.cities[0]?.code : (place?.cities as any)?.code),
+          dayNumber: parseDayNumber(item.replacement_group),
           lat: place?.lat ? parseFloat(place.lat) : undefined,
           lng: place?.lng ? parseFloat(place.lng) : undefined,
           slotType: item.slot_type,
           primaryType: place?.primary_type || 'ATTRACTION',
         });
       } else {
-        let eventQuery = supabaseAdmin
+        const { data: event } = await supabaseAdmin
           .from('events')
-          .select('title_ko, event_i18n(lang, title)')
-          .eq('event_id', item.ref_id);
-
-        if (pkg.city_id) {
-          eventQuery = eventQuery.eq('city_id', pkg.city_id);
-        }
-
-        const { data: event } = await eventQuery.maybeSingle();
+          .select('title_ko, cities(code), event_i18n(lang, title)')
+          .eq('event_id', item.ref_id)
+          .maybeSingle();
 
         const nameI18n: Record<string, string> = {};
         if (event && Array.isArray(event.event_i18n)) {
@@ -161,11 +196,21 @@ export async function GET(
           name: event?.title_ko || 'Unknown Event',
           nameKo: event?.title_ko || 'Unknown Event',
           nameI18n,
+          cityCode: (Array.isArray(event?.cities) ? event?.cities[0]?.code : (event?.cities as any)?.code),
+          dayNumber: parseDayNumber(item.replacement_group),
           slotType: item.slot_type,
           primaryType: 'PERFORMANCE',
         });
       }
     }
+
+    const resolvedCityCodes = Array.from(new Set(resolvedItems.map((item: any) => item.cityCode).filter(Boolean)));
+    const outputCityCodes = resolvedCityCodes.length > 0 ? resolvedCityCodes : requestedCityCodes;
+    const dayCount = Math.max(
+      ...resolvedItems.map((item: any) => item.dayNumber || 1),
+      dayCountFromVisitForm(pkg.visit_form, undefined)
+    ) as 1 | 2 | 3;
+    const cityName = formatCityScope(outputCityCodes).toUpperCase();
 
     return Response.json({
       success: true,
@@ -176,7 +221,10 @@ export async function GET(
         summary: pkg.summary,
         reasonText: pkg.reason_text,
         reasonTextSource: pkg.reason_text_source,
-        cityName: (Array.isArray(pkg.cities) ? pkg.cities[0]?.code : (pkg.cities as any)?.code) || requestedCityCode.toUpperCase(),
+        cityName,
+        cityCodes: outputCityCodes,
+        dayCount,
+        routeLabel: buildRouteLabel(dayCount, outputCityCodes),
         durationHours: pkg.duration_hours,
         items: resolvedItems,
       },

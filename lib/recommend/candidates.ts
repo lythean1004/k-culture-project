@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../supabase/admin';
 import { embedWithCache } from '../ai/embedding/cache';
 import { searchSimilarPlaces } from '../ai/embedding/search';
 import { Candidate, RecommendInput, ThemeCode } from './types';
+import { CityCode, normalizeCityCodes } from './cities';
 
 const NULL_UUID = '00000000-0000-0000-0000-000000000000';
 
@@ -35,6 +36,19 @@ export async function resolveCityId(cityCode: string): Promise<string> {
     .eq('code', cityCode)
     .maybeSingle();
   return data?.city_id || NULL_UUID;
+}
+
+async function resolveCityIds(cityCodes: string[]): Promise<Map<CityCode, string>> {
+  const resolved = new Map<CityCode, string>();
+
+  for (const cityCode of normalizeCityCodes(undefined, cityCodes)) {
+    const cityId = await resolveCityId(cityCode);
+    if (cityId !== NULL_UUID) {
+      resolved.set(cityCode, cityId);
+    }
+  }
+
+  return resolved;
 }
 
 function mapThemeToText(theme: ThemeCode, lang: string): string {
@@ -99,31 +113,38 @@ export function getCityMockData(cityCode: string): Candidate[] {
   return mockDb[resolvedCityCode].map(candidate => ({
     ...candidate,
     cityCode: resolvedCityCode,
+    source: 'mock',
   }));
 }
 
 async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidate[]> {
   const hasSupabase = hasSupabaseConfig();
+  const selectedCityCodes = normalizeCityCodes(input.cityCode, input.cityCodes);
   
   if (!hasSupabase) {
-    // Return city-specific mock data when Supabase is not configured
-    return getCityMockData(input.cityCode);
+    return selectedCityCodes.flatMap(cityCode => getCityMockData(cityCode));
   }
   
-  const cityId = await resolveCityId(input.cityCode);
+  const cityIdsByCode = await resolveCityIds(selectedCityCodes);
+  const cityIdToCode = new Map(Array.from(cityIdsByCode.entries()).map(([code, id]) => [id, code]));
+  const cityIds = Array.from(cityIdsByCode.values());
+
+  if (cityIds.length === 0) {
+    return selectedCityCodes.flatMap(cityCode => getCityMockData(cityCode));
+  }
   
   let candidates: Candidate[] = [];
   
   try {
     const { data: places } = await supabaseAdmin
       .from('places')
-      .select('place_id, name_ko, lat, lng, primary_type, sub_type, indoor_outdoor, official_url, phone, place_theme_map(theme_id, themes(code)), place_i18n(lang, name)')
-      .eq('city_id', cityId);
+      .select('place_id, city_id, name_ko, lat, lng, primary_type, sub_type, indoor_outdoor, official_url, phone, place_theme_map(theme_id, themes(code)), place_i18n(lang, name)')
+      .in('city_id', cityIds);
       
     const { data: events } = await supabaseAdmin
       .from('events')
-      .select('event_id, title_ko, official_url, genre, event_i18n(lang, title)')
-      .eq('city_id', cityId)
+      .select('event_id, city_id, title_ko, official_url, genre, event_i18n(lang, title)')
+      .in('city_id', cityIds)
       .eq('status', 'ACTIVE');
 
     places?.forEach((p: any) => {
@@ -143,8 +164,8 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
       candidates.push({
         id: p.place_id,
         entityType: 'PLACE',
-        cityCode: input.cityCode,
-        cityId,
+        cityCode: cityIdToCode.get(p.city_id) || input.cityCode,
+        cityId: p.city_id,
         primaryType: p.primary_type,
         subType: p.sub_type || undefined,
         nameKo: p.name_ko,
@@ -171,8 +192,8 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
       candidates.push({
         id: e.event_id,
         entityType: 'EVENT',
-        cityCode: input.cityCode,
-        cityId,
+        cityCode: cityIdToCode.get(e.city_id) || input.cityCode,
+        cityId: e.city_id,
         primaryType: 'PERFORMANCE',
         nameKo: e.title_ko,
         nameI18n,
@@ -186,10 +207,15 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
     console.warn('[Candidates] Supabase query failed, using mock data:', err);
   }
 
-  // If DB returned nothing (empty tables or query error), fall back to city-specific mock data
-  if (candidates.length === 0) {
-    console.log(`[Candidates] No DB data for ${input.cityCode}, using city-specific mock data`);
-    return getCityMockData(input.cityCode);
+  const coveredCityCodes = new Set(candidates.map(candidate => candidate.cityCode).filter(Boolean));
+  const missingCityCodes = selectedCityCodes.filter(cityCode => !coveredCityCodes.has(cityCode));
+
+  if (missingCityCodes.length > 0) {
+    console.log(`[Candidates] No DB data for ${missingCityCodes.join(', ')}, using city-specific mock data`);
+    candidates = [
+      ...candidates,
+      ...missingCityCodes.flatMap(cityCode => getCityMockData(cityCode)),
+    ];
   }
 
   return candidates;
@@ -221,38 +247,45 @@ export async function generateCandidates(
   
   if (flagEnabled) {
     try {
+      const selectedCityCodes = normalizeCityCodes(input.cityCode, input.cityCodes);
       const queryText = [
         ...input.interests.map(i => mapThemeToText(i, input.lang)),
         input.freeTextQuery ?? '',
       ].filter(Boolean).join(' ');
       
       const queryVector = await embedWithCache(queryText, 'query');
-      const cityId = await resolveCityId(input.cityCode);
-      
-      const placesByEmbedding = await searchSimilarPlaces({
-        queryVector,
-        cityId,
-        lang: input.lang,
-        limit: 80,
-      });
-      
-      semanticBased = placesByEmbedding
-        .filter((p: any) => cityId === NULL_UUID || p.city_id === cityId)
-        .map((p: any) => ({
-        id: p.place_id,
-        entityType: 'PLACE',
-        cityCode: input.cityCode,
-        cityId: p.city_id,
-        primaryType: p.primary_type,
-        nameKo: p.name,
-        nameI18n: { [input.lang]: p.name },
-        lat: p.lat,
-        lng: p.lng,
-        qualityGrade: 'A',
-        source: 'semantic',
-        semanticSimilarity: p.similarity,
-        themes: input.interests, // Assume matches interests
-      }));
+      const cityIdsByCode = await resolveCityIds(selectedCityCodes);
+
+      const semanticResults = await Promise.all(
+        Array.from(cityIdsByCode.entries()).map(async ([cityCode, cityId]) => {
+          const placesByEmbedding = await searchSimilarPlaces({
+            queryVector,
+            cityId,
+            lang: input.lang,
+            limit: 80,
+          });
+
+          return placesByEmbedding
+            .filter((p: any) => p.city_id === cityId)
+            .map((p: any) => ({
+              id: p.place_id,
+              entityType: 'PLACE' as const,
+              cityCode,
+              cityId: p.city_id,
+              primaryType: p.primary_type,
+              nameKo: p.name,
+              nameI18n: { [input.lang]: p.name },
+              lat: p.lat,
+              lng: p.lng,
+              qualityGrade: 'A' as const,
+              source: 'semantic',
+              semanticSimilarity: p.similarity,
+              themes: input.interests,
+            }));
+        })
+      );
+
+      semanticBased = semanticResults.flat();
     } catch (e) {
       console.warn('Semantic search failed, using rule-based only', e);
     }

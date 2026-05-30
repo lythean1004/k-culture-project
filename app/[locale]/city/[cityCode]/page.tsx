@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useSessionStore } from '@/lib/store/session';
 import { useRecommendation } from '@/lib/queries/recommend';
 import { RecommendInput, RecommendedPackage, ThemeCode } from '@/lib/recommend/types';
+import { dayCountFromVisitForm, formatCityScope, formatCityScopeKo, normalizeCityCode, normalizeCityCodes } from '@/lib/recommend/cities';
 import PackageCard from '@/components/package/PackageCard';
 import CityMap from '@/components/map/CityMap';
 import WeatherWidget from '@/components/WeatherWidget';
@@ -25,8 +26,21 @@ function CityPageContent({ cityCode, locale }: { cityCode: string, locale: strin
   const tCommon = useTranslations('common');
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session') || undefined;
+  const cityParam = searchParams.get('cities');
 
   const { userSession } = useSessionStore();
+  const selectedCityCodes = cityParam
+    ? normalizeCityCodes(undefined, cityParam.split(','))
+    : cityCode === 'multi'
+      ? normalizeCityCodes(userSession.cityCode, userSession.cityCodes)
+      : [normalizeCityCode(cityCode)];
+  const primaryCityCode = selectedCityCodes[0];
+  const cityScopeName = formatCityScope(selectedCityCodes);
+  const cityScopeNameKo = formatCityScopeKo(selectedCityCodes);
+  const tripDays = Math.max(
+    dayCountFromVisitForm(userSession.visitForm || 'DAY_TRIP', userSession.tripDays),
+    Math.min(selectedCityCodes.length, 3)
+  ) as 1 | 2 | 3;
 
   // Selected package in the list to highlight in the map
   const [selectedPkg, setSelectedPkg] = useState<RecommendedPackage | null>(null);
@@ -34,7 +48,9 @@ function CityPageContent({ cityCode, locale }: { cityCode: string, locale: strin
   // If Zustand store is empty (e.g. page refresh), we construct a fallback recommend input based on URL
   const recommendInput: RecommendInput = {
     sessionId,
-    cityCode,
+    cityCode: primaryCityCode,
+    cityCodes: selectedCityCodes,
+    tripDays,
     visitForm: userSession.visitForm || 'DAY_TRIP',
     interests: (userSession.interests && userSession.interests.length > 0)
       ? userSession.interests
@@ -53,10 +69,8 @@ function CityPageContent({ cityCode, locale }: { cityCode: string, locale: strin
     : [];
 
   useEffect(() => {
-    if (sortedPackages.length > 0 && !selectedPkg) {
-      setSelectedPkg(sortedPackages[0]);
-    }
-  }, [sortedPackages, selectedPkg]);
+    setSelectedPkg(sortedPackages[0] || null);
+  }, [data?.packages]);
 
   // Mock weather state
   const [weatherCode, setWeatherCode] = useState('Clear');
@@ -64,14 +78,17 @@ function CityPageContent({ cityCode, locale }: { cityCode: string, locale: strin
 
   useEffect(() => {
     // If city is Namwon or Jeonju, mock slightly different weather
-    if (cityCode === 'namwon' || cityCode === 'jeonju') {
+    if (selectedCityCodes.length > 1) {
+      setWeatherCode('Variable');
+      setTempC(22);
+    } else if (primaryCityCode === 'namwon' || primaryCityCode === 'jeonju') {
       setWeatherCode('Cloudy');
       setTempC(21);
-    } else if (cityCode === 'gyeongju') {
+    } else if (primaryCityCode === 'gyeongju') {
       setWeatherCode('Rain');
       setTempC(18);
     }
-  }, [cityCode]);
+  }, [primaryCityCode, selectedCityCodes.length]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
@@ -104,10 +121,10 @@ function CityPageContent({ cityCode, locale }: { cityCode: string, locale: strin
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
           <div>
             <h1 className="text-4xl font-extrabold capitalize text-transparent bg-clip-text bg-gradient-to-r from-purple-200 via-pink-100 to-indigo-200">
-              {cityCode} Cultural Packages
+              {tripDays}-Day {cityScopeName} Courses
             </h1>
             <p className="text-slate-400 mt-1">
-              Curated combinations of museums, performances, attractions in {cityCode}
+              {cityScopeNameKo} 중심으로 구성한 일자별 문화 코스
             </p>
           </div>
           <div className="w-full md:w-auto md:min-w-[320px]">
@@ -162,7 +179,7 @@ function CityPageContent({ cityCode, locale }: { cityCode: string, locale: strin
 
           {/* Right: Map Pane (Sticky) */}
           <div className="lg:col-span-7 h-[500px] lg:h-[calc(100vh-240px)] sticky top-24">
-            <CityMap items={selectedPkg?.items || []} cityCode={cityCode} />
+            <CityMap items={selectedPkg?.items || []} cityCode={primaryCityCode} cityCodes={selectedCityCodes} />
           </div>
         </div>
       </main>

@@ -25,6 +25,7 @@ export default function PackageDetailPage({ params }: PackageDetailPageProps) {
   const { packageId, locale } = params;
   const searchParams = useSearchParams();
   const cityParam = searchParams.get('city');
+  const citiesParam = searchParams.get('cities');
   const t = useTranslations('package');
   const tCommon = useTranslations('common');
 
@@ -45,7 +46,7 @@ export default function PackageDetailPage({ params }: PackageDetailPageProps) {
 
   useEffect(() => {
     fetchPackageDetails();
-  }, [packageId, cityParam]);
+  }, [packageId, cityParam, citiesParam]);
 
   const fetchPackageDetails = async () => {
     setLoading(true);
@@ -53,12 +54,17 @@ export default function PackageDetailPage({ params }: PackageDetailPageProps) {
     try {
       const cacheBuster = new Date().getTime();
       const cityQuery = cityParam ? `&city=${encodeURIComponent(cityParam)}` : '';
-      const res = await ofetch<{ success: boolean; data: any; error?: string }>(`/api/packages/${packageId}?_t=${cacheBuster}${cityQuery}`);
+      const citiesQuery = citiesParam ? `&cities=${encodeURIComponent(citiesParam)}` : '';
+      const res = await ofetch<{ success: boolean; data: any; error?: string }>(`/api/packages/${packageId}?_t=${cacheBuster}${cityQuery}${citiesQuery}`);
       if (res.success && res.data) {
         setPkg(res.data);
         // Set weather based on city
-        const city = res.data.cityName?.toLowerCase() || 'seoul';
-        if (city === 'namwon' || city === 'jeonju') {
+        const cityCodes = res.data.cityCodes || [];
+        const city = cityCodes[0] || res.data.cityName?.toLowerCase() || 'seoul';
+        if (cityCodes.length > 1) {
+          setWeatherCode('Variable');
+          setTempC(22);
+        } else if (city === 'namwon' || city === 'jeonju') {
           setWeatherCode('Cloudy');
           setTempC(21);
         } else if (city === 'gyeongju') {
@@ -135,6 +141,10 @@ export default function PackageDetailPage({ params }: PackageDetailPageProps) {
 
   // Determine highlighted items for map based on hovered item from timeline
   const mapItems = hoveredIdx !== null ? [pkg.items[hoveredIdx]] : pkg.items;
+  const packageCityCodes = pkg.cityCodes && pkg.cityCodes.length > 0 ? pkg.cityCodes : [pkg.cityName?.toLowerCase() || 'seoul'];
+  const backHref = packageCityCodes.length > 1
+    ? `/${locale}/city/multi?cities=${packageCityCodes.join(',')}${userSession.sessionId ? `&session=${userSession.sessionId}` : ''}`
+    : `/${locale}/city/${packageCityCodes[0]}${userSession.sessionId ? `?session=${userSession.sessionId}` : ''}`;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
@@ -151,7 +161,7 @@ export default function PackageDetailPage({ params }: PackageDetailPageProps) {
           </div>
           <div className="flex items-center gap-4">
             <Link
-              href={`/${locale}/city/${pkg.cityName?.toLowerCase()}?session=${userSession.sessionId || ''}`}
+              href={backHref}
               className="px-4 py-1.5 rounded-lg border border-slate-700 bg-slate-950 text-slate-300 text-xs font-semibold hover:bg-slate-800 transition"
             >
               Back to List
@@ -199,7 +209,7 @@ export default function PackageDetailPage({ params }: PackageDetailPageProps) {
           {/* Right Panel: Map Sidebar */}
           <div className="lg:col-span-5 h-[400px] lg:h-[520px] sticky top-24">
             <div className="h-full rounded-2xl overflow-hidden border border-slate-800">
-              <CityMap items={mapItems} cityCode={pkg.cityName?.toLowerCase() || 'seoul'} />
+              <CityMap items={mapItems} cityCode={packageCityCodes[0]} cityCodes={packageCityCodes} />
             </div>
           </div>
         </div>

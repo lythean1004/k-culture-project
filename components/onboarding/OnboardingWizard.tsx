@@ -5,20 +5,16 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useSessionStore } from '@/lib/store/session';
 import { ThemeCode, VisitForm } from '@/lib/recommend/types';
+import { CITY_OPTIONS, CityCode, dayCountFromVisitForm, normalizeCityCode, normalizeCityCodes, visitFormFromDayCount } from '@/lib/recommend/cities';
 import LanguageSwitcher from '../i18n/LanguageSwitcher';
+import { CalendarDays, MapPin, Route } from 'lucide-react';
 
 interface OnboardingWizardProps {
   locale: string;
   initialCity?: string;
 }
 
-const cityList = [
-  { code: 'seoul', name: 'Seoul', nameKo: '서울', img: 'https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=300&q=80' },
-  { code: 'busan', name: 'Busan', nameKo: '부산', img: 'https://images.unsplash.com/photo-1578840602674-bd891cb7ea5b?auto=format&fit=crop&w=300&q=80' },
-  { code: 'gyeongju', name: 'Gyeongju', nameKo: '경주', img: 'https://images.unsplash.com/photo-1622547748225-3fc4abd2cca0?auto=format&fit=crop&w=300&q=80' },
-  { code: 'jeonju', name: 'Jeonju', nameKo: '전주', img: 'https://images.unsplash.com/photo-1590001155093-a3c66ab0c3ff?auto=format&fit=crop&w=300&q=80' },
-  { code: 'namwon', name: 'Namwon', nameKo: '남원', img: 'https://images.unsplash.com/photo-1616058097781-80bb6e2a76f6?auto=format&fit=crop&w=300&q=80' },
-];
+const cityList = CITY_OPTIONS;
 
 const transportModes = [
   { code: 'WALK', emoji: '🚶' },
@@ -44,21 +40,32 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
   const { userSession, setSession } = useSessionStore();
   const [step, setStep] = useState(userSession.step || 1);
   const [loading, setLoading] = useState(false);
+  const initialCityCode = normalizeCityCode(initialCity || userSession.cityCode);
+  const initialSelectedCities = initialCity
+    ? [initialCityCode]
+    : normalizeCityCodes(userSession.cityCode, userSession.cityCodes);
 
   // States mirroring store inputs for wizard step validation
-  const [selectedCity, setSelectedCity] = useState(initialCity || userSession.cityCode || 'seoul');
+  const [selectedCities, setSelectedCities] = useState<CityCode[]>(initialSelectedCities);
+  const [multiRegion, setMultiRegion] = useState(initialSelectedCities.length > 1);
   const [visitForm, setVisitForm] = useState<VisitForm>((userSession.visitForm as VisitForm) || 'DAY_TRIP');
   const [transportMode, setTransportMode] = useState(userSession.transportMode || 'TRANSIT');
   const [interests, setInterests] = useState<ThemeCode[]>(userSession.interests || []);
   const [freeTextQuery, setFreeTextQuery] = useState(userSession.freeTextQuery || '');
   const [consentLocation, setConsentLocation] = useState(false);
+  const requestedDayCount = dayCountFromVisitForm(visitForm);
+  const effectiveDayCount = Math.max(requestedDayCount, Math.min(selectedCities.length, 3)) as 1 | 2 | 3;
+  const effectiveVisitForm = visitFormFromDayCount(effectiveDayCount);
+  const selectedCity = selectedCities[0] || 'seoul';
 
   const syncWizardSession = (nextStep = step) => {
     setSession({
       step: nextStep,
       lang: locale as any,
       cityCode: selectedCity,
-      visitForm,
+      cityCodes: selectedCities,
+      tripDays: effectiveDayCount,
+      visitForm: effectiveVisitForm,
       transportMode: transportMode as any,
       interests,
       freeTextQuery,
@@ -67,10 +74,53 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
 
   useEffect(() => {
     if (initialCity) {
-      setSelectedCity(initialCity);
-      setSession({ cityCode: initialCity });
+      const normalizedInitialCity = normalizeCityCode(initialCity);
+      setSelectedCities([normalizedInitialCity]);
+      setMultiRegion(false);
+      setSession({ cityCode: normalizedInitialCity, cityCodes: [normalizedInitialCity] });
     }
   }, [initialCity, setSession]);
+
+  const updateSelectedCities = (nextCities: CityCode[]) => {
+    const normalizedCities = normalizeCityCodes(undefined, nextCities);
+    setSelectedCities(normalizedCities);
+    setSession({ cityCode: normalizedCities[0], cityCodes: normalizedCities });
+
+    if (normalizedCities.length > requestedDayCount) {
+      setVisitForm(visitFormFromDayCount(normalizedCities.length));
+    }
+  };
+
+  const handleCitySelect = (cityCode: CityCode) => {
+    if (!multiRegion) {
+      updateSelectedCities([cityCode]);
+      return;
+    }
+
+    const alreadySelected = selectedCities.includes(cityCode);
+    const nextCities = alreadySelected
+      ? selectedCities.filter(code => code !== cityCode)
+      : [...selectedCities, cityCode].slice(0, 3);
+
+    updateSelectedCities(nextCities.length > 0 ? nextCities : [cityCode]);
+  };
+
+  const handleMultiRegionToggle = (enabled: boolean) => {
+    setMultiRegion(enabled);
+    if (!enabled) {
+      updateSelectedCities([selectedCity]);
+    }
+  };
+
+  const buildResultPath = (sessionId?: string) => {
+    const params = new URLSearchParams();
+    if (sessionId) params.set('session', sessionId);
+    if (selectedCities.length > 1) params.set('cities', selectedCities.join(','));
+
+    const routeCity = selectedCities.length > 1 ? 'multi' : selectedCity;
+    const query = params.toString();
+    return `/${locale}/city/${routeCity}${query ? `?${query}` : ''}`;
+  };
 
   const handleNext = () => {
     if (step < 4) {
@@ -107,7 +157,9 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
     const sessionData = {
       lang: locale as any,
       cityCode: selectedCity,
-      visitForm,
+      cityCodes: selectedCities,
+      tripDays: effectiveDayCount,
+      visitForm: effectiveVisitForm,
       interests,
       transportMode: transportMode as any,
       freeTextQuery,
@@ -148,14 +200,14 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
       if (data.success && data.sessionId) {
         setSession({ ...sessionData, sessionId: data.sessionId });
         // Redirect to city list page with session query param
-        router.push(`/${locale}/city/${selectedCity}?session=${data.sessionId}`);
+        router.push(buildResultPath(data.sessionId));
       } else {
         throw new Error(data.error || 'Failed to initialize session');
       }
     } catch (e: any) {
       console.error('Onboarding failed:', e);
       alert(`Failed to save session. Moving to recommendation list directly. Error details: ${e.message}`);
-      router.push(`/${locale}/city/${selectedCity}`);
+      router.push(buildResultPath());
     } finally {
       setLoading(false);
     }
@@ -198,29 +250,74 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
             <h2 className="text-2xl font-bold text-slate-100">{t('step2.title')}</h2>
             <p className="text-sm text-slate-400">{t('step2.description')}</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 py-4">
-            {cityList.map((city) => (
+          <div className="flex justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleMultiRegionToggle(false)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold transition ${
+                !multiRegion
+                  ? 'bg-purple-600/20 border-purple-500 text-purple-200'
+                  : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              Single city
+            </button>
+            <button
+              type="button"
+              onClick={() => handleMultiRegionToggle(true)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold transition ${
+                multiRegion
+                  ? 'bg-pink-600/20 border-pink-500 text-pink-200'
+                  : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+              }`}
+            >
+              <Route className="w-4 h-4" />
+              Multi-region
+            </button>
+          </div>
+
+          <div className="relative h-[360px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/80">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(168,85,247,0.18),transparent_26%),linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,41,59,0.65))]"></div>
+            <div className="absolute inset-x-12 top-8 bottom-8 rounded-[42%] border border-slate-700/70 bg-slate-900/40"></div>
+            <div className="absolute left-[42%] top-[18%] h-[56%] border-l border-dashed border-slate-600/80 rotate-[16deg]"></div>
+            <div className="absolute left-[48%] top-[52%] w-[30%] border-t border-dashed border-slate-600/80 rotate-[12deg]"></div>
+
+            {cityList.map((city) => {
+              const isSelected = selectedCities.includes(city.code);
+              return (
               <button
                 key={city.code}
                 type="button"
-                onClick={() => {
-                  setSelectedCity(city.code);
-                  setSession({ cityCode: city.code });
-                }}
-                className={`relative rounded-xl overflow-hidden border-2 h-36 flex flex-col justify-end p-3 transition-all duration-300 ${
-                  selectedCity === city.code
-                    ? 'border-purple-500 shadow-lg shadow-purple-500/20 scale-105'
-                    : 'border-slate-800 hover:border-slate-700'
+                onClick={() => handleCitySelect(city.code)}
+                className={`absolute -translate-x-1/2 -translate-y-1/2 min-w-[104px] rounded-xl border px-3 py-2 text-left shadow-lg transition-all ${
+                  isSelected
+                    ? 'border-purple-400 bg-purple-600/25 text-white shadow-purple-500/20'
+                    : 'border-slate-700 bg-slate-950/90 text-slate-300 hover:border-slate-500'
                 }`}
+                style={{ left: `${city.mapX}%`, top: `${city.mapY}%` }}
               >
-                <img src={city.img} alt={city.name} className="absolute inset-0 w-full h-full object-cover opacity-50" />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
-                <div className="relative z-10 text-left">
-                  <h4 className="font-bold text-sm text-white">{city.name}</h4>
-                  <p className="text-[10px] text-slate-300">{city.nameKo}</p>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-pink-300' : 'bg-slate-500'}`}></span>
+                  <div>
+                    <h4 className="font-bold text-sm">{city.name}</h4>
+                    <p className="text-[10px] text-slate-400">{city.nameKo} · {city.hubLabel}</p>
+                  </div>
                 </div>
               </button>
-            ))}
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-2">
+            {selectedCities.map((cityCode, index) => {
+              const city = cityList.find(item => item.code === cityCode);
+              return (
+                <span key={cityCode} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-[11px] font-semibold text-slate-300">
+                  Day {Math.min(index + 1, 3)} · {city?.name || cityCode}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
@@ -237,18 +334,24 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
             <label className="text-sm font-semibold text-slate-300 block">{t('step3.visitFormLabel')}</label>
             <div className="grid grid-cols-3 gap-4">
               {(['DAY_TRIP', 'STAY_1_3', 'THEME_TOUR'] as VisitForm[]).map((form) => {
-                const label = form === 'DAY_TRIP' ? t('step3.dayTrip') : form === 'STAY_1_3' ? t('step3.stay13') : t('step3.themeTour');
+                const dayCount = dayCountFromVisitForm(form);
+                const disabled = dayCount < selectedCities.length;
+                const label = `${dayCount}-Day Course`;
                 return (
                   <button
                     key={form}
                     type="button"
-                    onClick={() => setVisitForm(form)}
-                    className={`py-3 px-4 rounded-xl border text-sm font-medium transition-all duration-300 ${
+                    disabled={disabled}
+                    onClick={() => !disabled && setVisitForm(form)}
+                    className={`py-3 px-4 rounded-xl border text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 ${
                       visitForm === form
                         ? 'bg-purple-600/20 border-purple-500 text-purple-200'
+                        : disabled
+                          ? 'bg-slate-950/20 border-slate-900 text-slate-700 cursor-not-allowed'
                         : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
                     }`}
                   >
+                    <CalendarDays className="w-4 h-4" />
                     {label}
                   </button>
                 );

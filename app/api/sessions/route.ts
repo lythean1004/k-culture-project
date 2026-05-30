@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
       sessionId = crypto.randomUUID(),
       lang = 'en',
       cityCode,
+      cityCodes,
       visitForm,
       interests = [],
       transportMode = 'TRANSIT',
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
       const payload: any = {
         session_id: sessionId,
         lang,
-        city_code: cityCode,
+        city_code: Array.isArray(cityCodes) && cityCodes.length > 0 ? cityCodes.join(',') : cityCode,
         visit_form: visitForm,
         interests,
         transport_mode: transportMode,

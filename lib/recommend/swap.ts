@@ -20,6 +20,7 @@ export async function findSwapCandidates(
         name: candidate.nameI18n?.en || candidate.nameKo,
         nameKo: candidate.nameKo,
         nameI18n: candidate.nameI18n,
+        cityCode: candidate.cityCode,
         lat: candidate.lat,
         lng: candidate.lng,
         slotType: 'MORNING',
@@ -49,6 +50,7 @@ export async function findSwapCandidates(
     itemType: 'PLACE',
     refId: p.place_id,
     name: p.name_ko,
+    cityCode,
     lat: p.lat ? parseFloat(p.lat) : undefined,
     lng: p.lng ? parseFloat(p.lng) : undefined,
     slotType: 'MORNING', // Assumed slot type matching the swap position

@@ -24,7 +24,7 @@ export default function SwapModal({ packageId, cityCode, itemIndex, isOpen, onCl
     if (isOpen) {
       fetchCandidates();
     }
-  }, [isOpen, hint]);
+  }, [isOpen, hint, cityCode, itemIndex]);
 
   const fetchCandidates = async () => {
     setLoading(true);

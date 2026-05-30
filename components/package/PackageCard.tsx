@@ -15,7 +15,15 @@ interface PackageCardProps {
 
 export default function PackageCard({ pkg, locale, isSelected = false, onSelect }: PackageCardProps) {
   const t = useTranslations('package');
-  const cityCode = pkg.cityName?.toLowerCase();
+  const cityCodes = pkg.cityCodes && pkg.cityCodes.length > 0
+    ? pkg.cityCodes
+    : pkg.cityName
+      ? [pkg.cityName.toLowerCase()]
+      : [];
+  const detailParams = new URLSearchParams();
+  if (cityCodes[0]) detailParams.set('city', cityCodes[0]);
+  if (cityCodes.length > 1) detailParams.set('cities', cityCodes.join(','));
+  const detailQuery = detailParams.toString();
 
   // Map theme code to text labels
   const themeLabels: Record<string, string> = {
@@ -62,6 +70,9 @@ export default function PackageCard({ pkg, locale, isSelected = false, onSelect 
           {pkg.title}
         </h3>
         <p className="text-sm text-slate-400 line-clamp-1">{pkg.summary}</p>
+        {pkg.routeLabel && (
+          <p className="text-[11px] text-slate-500 line-clamp-1">{pkg.routeLabel}</p>
+        )}
       </div>
 
       {/* Reason text */}
@@ -73,6 +84,8 @@ export default function PackageCard({ pkg, locale, isSelected = false, onSelect 
       <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-900">
         <div className="flex items-center gap-3">
           <span>🕒 {t('duration', { hours: pkg.durationHours ?? 8 })}</span>
+          <span>•</span>
+          <span>{pkg.dayCount || 1} day</span>
           <span>•</span>
           <span>🛣️ {t('stops', { count: pkg.items.length })}</span>
         </div>
@@ -94,7 +107,7 @@ export default function PackageCard({ pkg, locale, isSelected = false, onSelect 
       {/* CTA detail link */}
       <div className="pt-2">
         <Link
-          href={`/${locale}/package/${pkg.packageId}${cityCode ? `?city=${cityCode}` : ''}`}
+          href={`/${locale}/package/${pkg.packageId}${detailQuery ? `?${detailQuery}` : ''}`}
           className="block w-full text-center py-2 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold tracking-wider transition-all"
           onClick={(e) => e.stopPropagation()} // Prevent card selection triggering
         >

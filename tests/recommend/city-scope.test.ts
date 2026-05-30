@@ -39,6 +39,18 @@ function makeInput(cityCode: string): RecommendInput {
   };
 }
 
+function makeMultiInput(cityCodes: string[], visitForm: RecommendInput['visitForm'] = 'STAY_1_3'): RecommendInput {
+  return {
+    cityCode: cityCodes[0],
+    cityCodes,
+    tripDays: cityCodes.length === 3 ? 3 : 2,
+    visitForm,
+    interests: ['HISTORY'],
+    lang: 'en',
+    transportMode: 'TRANSIT',
+  };
+}
+
 describe('recommendation city scoping', () => {
   beforeEach(withoutSupabaseEnv);
   afterEach(restoreSupabaseEnv);
@@ -88,6 +100,35 @@ describe('recommendation city scoping', () => {
     expect(itemNames).not.toContain('국립중앙박물관');
   });
 
+  it('builds multi-region courses only from selected cities with day assignments', async () => {
+    const input = makeMultiInput(['busan', 'gyeongju']);
+    const context: RecommendContext = {
+      now: new Date('2026-05-30T12:00:00+09:00'),
+      weather: 'Clear',
+      anchorPlaces: [],
+    };
+
+    const candidates = await generateCandidates(input);
+    const filtered = applyFilters(candidates, input, context);
+    const scored = filtered.map(candidate => ({
+      ...candidate,
+      score: scoreCandidate(candidate, input, context),
+    }));
+    const packages = bundlePackages(scored, input);
+    const firstPackage = packages[0];
+    const itemCityCodes = new Set(firstPackage.items.map(item => item.cityCode));
+    const itemNames = firstPackage.items.map(item => item.nameKo || item.name);
+
+    expect(firstPackage.dayCount).toBe(2);
+    expect(firstPackage.cityCodes).toEqual(['busan', 'gyeongju']);
+    expect(itemCityCodes).toEqual(new Set(['busan', 'gyeongju']));
+    expect(firstPackage.items.every(item => item.dayNumber === 1 || item.dayNumber === 2)).toBe(true);
+    expect(itemNames).toContain('부산박물관');
+    expect(itemNames).toContain('불국사');
+    expect(itemNames).not.toContain('경복궁');
+    expect(itemNames).not.toContain('국립중앙박물관');
+  });
+
   it('returns city-specific package details for local fallback package ids', async () => {
     const request = new NextRequest('http://localhost/api/packages/pkg-day-busan-history-0?city=busan');
     const response = await getPackageDetails(request, {
@@ -97,7 +138,27 @@ describe('recommendation city scoping', () => {
     const itemNames = json.data.items.map((item: { nameKo: string }) => item.nameKo);
 
     expect(json.data.cityName).toBe('BUSAN');
+    expect(json.data.cityCodes).toEqual(['busan']);
+    expect(json.data.dayCount).toBe(1);
     expect(itemNames).toContain('부산박물관');
+    expect(itemNames).not.toContain('경복궁');
+    expect(itemNames).not.toContain('국립중앙박물관');
+  });
+
+  it('returns multi-region package details for local fallback package ids', async () => {
+    const request = new NextRequest('http://localhost/api/packages/pkg-2d-multi-busan-gyeongju-history-0?cities=busan,gyeongju');
+    const response = await getPackageDetails(request, {
+      params: { packageId: 'pkg-2d-multi-busan-gyeongju-history-0' },
+    });
+    const json = await response.json();
+    const itemCityCodes = new Set(json.data.items.map((item: { cityCode: string }) => item.cityCode));
+    const itemNames = json.data.items.map((item: { nameKo: string }) => item.nameKo);
+
+    expect(json.data.cityCodes).toEqual(['busan', 'gyeongju']);
+    expect(json.data.dayCount).toBe(2);
+    expect(itemCityCodes).toEqual(new Set(['busan', 'gyeongju']));
+    expect(itemNames).toContain('부산박물관');
+    expect(itemNames).toContain('불국사');
     expect(itemNames).not.toContain('경복궁');
     expect(itemNames).not.toContain('국립중앙박물관');
   });

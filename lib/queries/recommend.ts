@@ -9,8 +9,10 @@ interface RecommendResponse {
 }
 
 export function useRecommendation(input: RecommendInput) {
+  const cityScopeKey = (input.cityCodes && input.cityCodes.length > 0 ? input.cityCodes : [input.cityCode]).join(',');
+
   return useQuery<RecommendResponse>({
-    queryKey: ['recommend', input.lang, input.cityCode, input.visitForm, input.interests.join(','), input.transportMode, input.freeTextQuery],
+    queryKey: ['recommend', input.lang, cityScopeKey, input.tripDays, input.visitForm, input.interests.join(','), input.transportMode, input.freeTextQuery],
     queryFn: async () => {
       // client-side fetching to the Next.js API Route with cache-buster
       const cacheBuster = new Date().getTime();

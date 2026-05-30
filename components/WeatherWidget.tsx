@@ -22,6 +22,9 @@ export default function WeatherWidget({ currentWeather = 'Clear', tempC = 22 }: 
     if (norm.includes('SNOW')) {
       return { emoji: '❄️', isRain: false, label: 'Snowy' };
     }
+    if (norm.includes('VARIABLE')) {
+      return { emoji: '🧭', isRain: false, label: 'Variable' };
+    }
     return { emoji: '☀️', isRain: false, label: 'Clear' };
   };
 

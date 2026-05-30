@@ -12,12 +12,15 @@ import { bundlePackages } from '../../../lib/recommend/bundler';
 import { generateReasonText } from '../../../lib/recommend/reason';
 import { RecommendContext, RecommendInput, ThemeCode } from '../../../lib/recommend/types';
 import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { dayCountFromVisitForm, normalizeCityCodes, visitFormFromDayCount } from '../../../lib/recommend/cities';
 
 const NULL_UUID = '00000000-0000-0000-0000-000000000000';
 
 const RecommendInputSchema = z.object({
   sessionId: z.string().optional(),
   cityCode: z.enum(['seoul', 'busan', 'gyeongju', 'jeonju', 'namwon']),
+  cityCodes: z.array(z.enum(['seoul', 'busan', 'gyeongju', 'jeonju', 'namwon'])).max(3).optional(),
+  tripDays: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   visitForm: z.enum(['DAY_TRIP', 'STAY_1_3', 'THEME_TOUR']),
   interests: z.array(z.string()).max(5),
   freeTextQuery: z.string().max(200).optional(),
@@ -53,10 +56,12 @@ async function buildContext(input: any): Promise<RecommendContext> {
     }
   }
 
+  const selectedCityCodes = normalizeCityCodes(input.cityCode, input.cityCodes);
+
   return {
     now: new Date(),
     weather,
-    anchorPlaces: input.currentLocation ? [input.currentLocation] : [],
+    anchorPlaces: selectedCityCodes.length === 1 && input.currentLocation ? [input.currentLocation] : [],
   };
 }
 
@@ -77,6 +82,9 @@ async function resolveThemeId(themeCode?: string): Promise<string | null> {
 async function savePackages(packages: any[], input: any) {
   const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!hasSupabase) return;
+
+  const containsLocalFallback = packages.some(pkg => pkg.items?.some((item: any) => item.source === 'mock'));
+  if (containsLocalFallback) return;
 
   const resolvedCityId = await resolveCityId(input.cityCode);
   const cityId = resolvedCityId !== NULL_UUID ? resolvedCityId : null;
@@ -114,6 +122,7 @@ async function savePackages(packages: any[], input: any) {
         item_type: item.itemType,
         ref_id: item.refId,
         slot_type: item.slotType,
+        replacement_group: item.dayNumber ? `day:${item.dayNumber}` : null,
       }));
       
       await supabaseAdmin.from('package_items').insert(itemsToInsert);
@@ -126,10 +135,20 @@ async function savePackages(packages: any[], input: any) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const input = RecommendInputSchema.parse(body) as unknown as RecommendInput;
+    const parsed = RecommendInputSchema.parse(body);
+    const selectedCityCodes = normalizeCityCodes(parsed.cityCode, parsed.cityCodes);
+    const requestedDays = dayCountFromVisitForm(parsed.visitForm, parsed.tripDays);
+    const tripDays = Math.max(requestedDays, Math.min(selectedCityCodes.length, 3)) as 1 | 2 | 3;
+    const input = {
+      ...parsed,
+      cityCode: selectedCityCodes[0],
+      cityCodes: selectedCityCodes,
+      tripDays,
+      visitForm: visitFormFromDayCount(tripDays),
+    } as unknown as RecommendInput;
     
     // Bump version when recommendation composition rules change.
-    const cacheKey = `rec:v5:${hashInput(input)}`;
+    const cacheKey = `rec:v7:${hashInput(input)}`;
     const cached = await cache.get(cacheKey);
     if (cached) {
       return Response.json(JSON.parse(cached));

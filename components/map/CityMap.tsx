@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { PackageItem } from '@/lib/recommend/types';
+import { getCityOption, normalizeCityCodes } from '@/lib/recommend/cities';
 
 interface CityMapProps {
   items: PackageItem[];
   cityCode: string;
+  cityCodes?: string[];
 }
 
-export default function CityMap({ items = [], cityCode }: CityMapProps) {
+export default function CityMap({ items = [], cityCode, cityCodes }: CityMapProps) {
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
 
   useEffect(() => {
@@ -18,16 +20,8 @@ export default function CityMap({ items = [], cityCode }: CityMapProps) {
     }
   }, []);
 
-  // Center coordinate mapping for 5 cities
-  const cityCenters: Record<string, { lat: number; lng: number }> = {
-    seoul: { lat: 37.5665, lng: 126.9780 },
-    busan: { lat: 35.1796, lng: 129.0756 },
-    gyeongju: { lat: 35.8562, lng: 129.2132 },
-    jeonju: { lat: 35.8242, lng: 127.1480 },
-    namwon: { lat: 35.4164, lng: 127.3904 },
-  };
-
-  const center = cityCenters[cityCode] || cityCenters.seoul;
+  const selectedCityCodes = normalizeCityCodes(cityCode, cityCodes);
+  const cityLabel = selectedCityCodes.map(code => getCityOption(code).name).join(' + ');
 
   // We mock a gorgeous interactive map interface in case Google Maps API is not loaded or key is missing.
   // This satisfies standard visual aesthetics and prevents blank screens.
@@ -50,8 +44,21 @@ export default function CityMap({ items = [], cityCode }: CityMapProps) {
         {/* Dynamic Markers Represented visually */}
         <div className="relative w-full max-w-sm h-64 border border-purple-500/10 rounded-xl bg-slate-900/60 p-4 flex items-center justify-center">
           <div className="absolute text-[11px] font-semibold text-purple-400 bg-slate-950/80 px-2 py-0.5 border border-purple-500/20 rounded top-4 left-4 uppercase tracking-widest">
-            {cityCode} Area View
+            {cityLabel} Area View
           </div>
+
+          {selectedCityCodes.map(code => {
+            const city = getCityOption(code);
+            return (
+              <div
+                key={code}
+                className="absolute rounded-lg border border-cyan-500/20 bg-cyan-950/50 px-2 py-1 text-[9px] font-bold text-cyan-200"
+                style={{ left: `${city.mapX}%`, top: `${city.mapY}%` }}
+              >
+                {city.name}
+              </div>
+            );
+          })}
           
           <div className="relative w-full h-full flex items-center justify-center">
             {/* Center Anchor Pin */}
@@ -72,10 +79,10 @@ export default function CityMap({ items = [], cityCode }: CityMapProps) {
                   style={{ transform: `translate(${x}px, ${y}px)` }}
                 >
                   <div className="w-7 h-7 rounded-full bg-slate-950 border-2 border-pink-500 text-[10px] font-bold flex items-center justify-center text-pink-400 shadow-md group-hover:scale-110 transition-transform">
-                    {idx + 1}
+                    {item.dayNumber || idx + 1}
                   </div>
                   <div className="absolute top-8 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded text-[9px] font-semibold whitespace-nowrap opacity-80 max-w-[100px] overflow-hidden text-ellipsis shadow-lg text-slate-200">
-                    {item.name}
+                    {item.cityCode ? `${getCityOption(item.cityCode).name}: ` : ''}{item.name}
                   </div>
                 </div>
               );
@@ -86,7 +93,7 @@ export default function CityMap({ items = [], cityCode }: CityMapProps) {
         <div className="z-10 space-y-1">
           <h4 className="font-bold text-sm text-slate-300">Interactive Route Visualizer</h4>
           <p className="text-[11px] text-slate-500 max-w-xs leading-normal">
-            Displaying {items.length} route stops mapped for the selected curation package in {cityCode.toUpperCase()}.
+            Displaying {items.length} route stops mapped for the selected curation package in {cityLabel.toUpperCase()}.
           </p>
         </div>
       </div>
