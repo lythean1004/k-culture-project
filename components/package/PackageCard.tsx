@@ -15,6 +15,7 @@ interface PackageCardProps {
 
 export default function PackageCard({ pkg, locale, isSelected = false, onSelect }: PackageCardProps) {
   const t = useTranslations('package');
+  const cityCode = pkg.cityName?.toLowerCase();
 
   // Map theme code to text labels
   const themeLabels: Record<string, string> = {
@@ -93,7 +94,7 @@ export default function PackageCard({ pkg, locale, isSelected = false, onSelect 
       {/* CTA detail link */}
       <div className="pt-2">
         <Link
-          href={`/${locale}/package/${pkg.packageId}`}
+          href={`/${locale}/package/${pkg.packageId}${cityCode ? `?city=${cityCode}` : ''}`}
           className="block w-full text-center py-2 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold tracking-wider transition-all"
           onClick={(e) => e.stopPropagation()} // Prevent card selection triggering
         >

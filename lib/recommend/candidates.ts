@@ -3,9 +3,15 @@ import { embedWithCache } from '../ai/embedding/cache';
 import { searchSimilarPlaces } from '../ai/embedding/search';
 import { Candidate, RecommendInput, ThemeCode } from './types';
 
+const NULL_UUID = '00000000-0000-0000-0000-000000000000';
+
+function hasSupabaseConfig(): boolean {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 export async function isFeatureFlagEnabled(key: string): Promise<boolean> {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return key === 'ai_rerank'; // Default true for testing
+  if (!hasSupabaseConfig()) {
+    return false;
   }
   try {
     const { data } = await supabaseAdmin
@@ -20,15 +26,15 @@ export async function isFeatureFlagEnabled(key: string): Promise<boolean> {
 }
 
 export async function resolveCityId(cityCode: string): Promise<string> {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return '00000000-0000-0000-0000-000000000000';
+  if (!hasSupabaseConfig()) {
+    return NULL_UUID;
   }
   const { data } = await supabaseAdmin
     .from('cities')
     .select('city_id')
     .eq('code', cityCode)
     .maybeSingle();
-  return data?.city_id || '00000000-0000-0000-0000-000000000000';
+  return data?.city_id || NULL_UUID;
 }
 
 function mapThemeToText(theme: ThemeCode, lang: string): string {
@@ -50,7 +56,7 @@ function mapKopisGenreToTheme(genre: string): ThemeCode {
   return 'FESTIVAL';
 }
 
-function getCityMockData(cityCode: string): Candidate[] {
+export function getCityMockData(cityCode: string): Candidate[] {
   const mockDb: Record<string, Candidate[]> = {
     seoul: [
       { id: '00000000-0000-0000-0000-000000000001', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '경복궁', nameI18n: { en: 'Gyeongbokgung Palace', 'zh-Hans': '景福宫' }, lat: 37.5796, lng: 126.9770, qualityGrade: 'A', source: 'rule', themes: ['HISTORY'] },
@@ -72,6 +78,7 @@ function getCityMockData(cityCode: string): Candidate[] {
       { id: '00000000-0000-0000-0000-000000000023', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '동궁과 월지', nameI18n: { en: 'Donggung and Wolji' }, lat: 35.8340, lng: 129.2268, qualityGrade: 'A', source: 'rule', themes: ['HISTORY', 'NIGHT'] },
       { id: '00000000-0000-0000-0000-000000000024', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '첨성대', nameI18n: { en: 'Cheomseongdae' }, lat: 35.8347, lng: 129.2190, qualityGrade: 'A', source: 'rule', themes: ['HISTORY'] },
       { id: '00000000-0000-0000-0000-000000000025', entityType: 'PLACE', primaryType: 'RESTAURANT', nameKo: '황남빵 본점', nameI18n: { en: 'Hwangnam Bakery' }, lat: 35.8383, lng: 129.2136, qualityGrade: 'A', source: 'rule', themes: ['FOOD'] },
+      { id: '00000000-0000-0000-0000-000000000026', entityType: 'PLACE', primaryType: 'MUSEUM', nameKo: '국립경주박물관', nameI18n: { en: 'Gyeongju National Museum' }, lat: 35.8330, lng: 129.2195, qualityGrade: 'A', source: 'rule', themes: ['HISTORY'] },
     ],
     jeonju: [
       { id: '00000000-0000-0000-0000-000000000031', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '전주한옥마을', nameI18n: { en: 'Jeonju Hanok Village' }, lat: 35.8147, lng: 127.1526, qualityGrade: 'A', source: 'rule', themes: ['HISTORY'] },
@@ -88,11 +95,15 @@ function getCityMockData(cityCode: string): Candidate[] {
       { id: '00000000-0000-0000-0000-000000000045', entityType: 'PLACE', primaryType: 'ATTRACTION', nameKo: '지리산 국립공원', nameI18n: { en: 'Jirisan National Park' }, lat: 35.3371, lng: 127.7306, qualityGrade: 'A', source: 'rule', themes: ['WELLNESS', 'FAMILY'] },
     ],
   };
-  return mockDb[cityCode] || mockDb['seoul'];
+  const resolvedCityCode = mockDb[cityCode] ? cityCode : 'seoul';
+  return mockDb[resolvedCityCode].map(candidate => ({
+    ...candidate,
+    cityCode: resolvedCityCode,
+  }));
 }
 
 async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidate[]> {
-  const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const hasSupabase = hasSupabaseConfig();
   
   if (!hasSupabase) {
     // Return city-specific mock data when Supabase is not configured
@@ -132,6 +143,8 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
       candidates.push({
         id: p.place_id,
         entityType: 'PLACE',
+        cityCode: input.cityCode,
+        cityId,
         primaryType: p.primary_type,
         subType: p.sub_type || undefined,
         nameKo: p.name_ko,
@@ -158,6 +171,8 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
       candidates.push({
         id: e.event_id,
         entityType: 'EVENT',
+        cityCode: input.cityCode,
+        cityId,
         primaryType: 'PERFORMANCE',
         nameKo: e.title_ko,
         nameI18n,
@@ -195,6 +210,10 @@ export async function generateCandidates(
 ): Promise<Candidate[]> {
   // 1) Rule-based query from DB
   const ruleBased = await fetchRuleBasedCandidates(input);
+
+  if (!hasSupabaseConfig()) {
+    return dedupeCandidates(ruleBased);
+  }
   
   // 2) AI Semantic query via Embeddings
   const flagEnabled = await isFeatureFlagEnabled('ai_rerank');
@@ -217,9 +236,13 @@ export async function generateCandidates(
         limit: 80,
       });
       
-      semanticBased = placesByEmbedding.map((p: any) => ({
+      semanticBased = placesByEmbedding
+        .filter((p: any) => cityId === NULL_UUID || p.city_id === cityId)
+        .map((p: any) => ({
         id: p.place_id,
         entityType: 'PLACE',
+        cityCode: input.cityCode,
+        cityId: p.city_id,
         primaryType: p.primary_type,
         nameKo: p.name,
         nameI18n: { [input.lang]: p.name },

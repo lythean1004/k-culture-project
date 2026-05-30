@@ -7,13 +7,14 @@ import { ofetch } from 'ofetch';
 
 interface SwapModalProps {
   packageId: string;
+  cityCode?: string;
   itemIndex: number;
   isOpen: boolean;
   onClose: () => void;
   onSelectSwap: (item: PackageItem) => void;
 }
 
-export default function SwapModal({ packageId, itemIndex, isOpen, onClose, onSelectSwap }: SwapModalProps) {
+export default function SwapModal({ packageId, cityCode, itemIndex, isOpen, onClose, onSelectSwap }: SwapModalProps) {
   const t = useTranslations('package');
   const [candidates, setCandidates] = useState<PackageItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,7 @@ export default function SwapModal({ packageId, itemIndex, isOpen, onClose, onSel
       const res = await ofetch<{ success: boolean; data: PackageItem[] }>('/api/recommend/swap', {
         query: {
           packageId,
+          city: cityCode,
           itemIndex,
           hint: hint === 'indoor' ? 'indoor' : undefined,
         },

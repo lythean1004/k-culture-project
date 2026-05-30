@@ -26,6 +26,8 @@ export interface RecommendInput {
 export interface Candidate {
   id: string;
   entityType: 'PLACE' | 'EVENT';
+  cityCode?: string;
+  cityId?: string;
   primaryType: string;
   subType?: string;
   nameKo: string;

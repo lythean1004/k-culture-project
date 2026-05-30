@@ -9,23 +9,8 @@ export async function searchSimilarPlaces(params: {
   const { queryVector, cityId, lang, limit = 50 } = params;
   
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn('[Embedding Search] Supabase config missing. Returning dummy place results.');
-    return [
-      {
-        place_id: 'dummy-place-1',
-        city_id: cityId || 'dummy-city-1',
-        primary_type: 'ATTRACTION',
-        name: 'Gyeongbokgung Palace (Mock Search)',
-        similarity: 0.85,
-      },
-      {
-        place_id: 'dummy-place-2',
-        city_id: cityId || 'dummy-city-1',
-        primary_type: 'MUSEUM',
-        name: 'National Museum of Korea (Mock Search)',
-        similarity: 0.78,
-      }
-    ];
+    console.warn('[Embedding Search] Supabase config missing. Skipping semantic place results.');
+    return [];
   }
 
   const { data, error } = await supabaseAdmin.rpc('search_places_by_embedding', {
@@ -48,15 +33,8 @@ export async function searchSimilarEvents(params: {
   const { queryVector, cityId, lang, limit = 30 } = params;
   
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn('[Embedding Search] Supabase config missing. Returning dummy event results.');
-    return [
-      {
-        event_id: 'dummy-event-1',
-        city_id: cityId || 'dummy-city-1',
-        title: 'Traditional Gugak Performance (Mock Search)',
-        similarity: 0.82,
-      }
-    ];
+    console.warn('[Embedding Search] Supabase config missing. Skipping semantic event results.');
+    return [];
   }
 
   const { data, error } = await supabaseAdmin.rpc('search_events_by_embedding', {

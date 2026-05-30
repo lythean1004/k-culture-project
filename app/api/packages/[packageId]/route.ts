@@ -1,7 +1,39 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/admin';
+import { getCityMockData } from '../../../../lib/recommend/candidates';
+import { ThemeCode } from '../../../../lib/recommend/types';
 
 export const dynamic = "force-dynamic";
+
+const CITY_CODES = ['seoul', 'busan', 'gyeongju', 'jeonju', 'namwon'];
+const THEME_CODES: ThemeCode[] = [
+  'HISTORY',
+  'TRADITIONAL_MUSIC',
+  'MODERN_ART',
+  'FAMILY',
+  'NIGHT',
+  'WELLNESS',
+  'FOOD',
+  'FESTIVAL',
+];
+
+function normalizeCityCode(value?: string | null): string {
+  const normalized = value?.toLowerCase();
+  return normalized && CITY_CODES.includes(normalized) ? normalized : 'seoul';
+}
+
+function inferCityFromPackageId(packageId: string): string | undefined {
+  return CITY_CODES.find(cityCode => packageId.includes(`-${cityCode}-`));
+}
+
+function inferThemeFromPackageId(packageId: string): ThemeCode {
+  const upperPackageId = packageId.toUpperCase();
+  return THEME_CODES.find(theme => upperPackageId.includes(theme)) || 'HISTORY';
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
 
 export async function GET(
   req: NextRequest,
@@ -9,47 +41,40 @@ export async function GET(
 ) {
   try {
     const { packageId } = params;
+    const { searchParams } = new URL(req.url);
+    const requestedCityCode = normalizeCityCode(searchParams.get('city') || inferCityFromPackageId(packageId));
 
     const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!hasSupabase) {
-      // Mock package details fallback for local environment
+    if (!hasSupabase || !isUuid(packageId)) {
+      const themeCode = inferThemeFromPackageId(packageId);
+      const cityCandidates = getCityMockData(requestedCityCode);
+      const themedCandidates = cityCandidates.filter(candidate => candidate.themes.includes(themeCode));
+      const selectedCandidates = themedCandidates.length > 0 ? themedCandidates : cityCandidates;
+      const slotTypes = ['MORNING', 'LUNCH', 'AFTERNOON', 'EVENING'] as const;
+
       return Response.json({
         success: true,
         data: {
           packageId,
-          themeCode: 'HISTORY',
-          title: 'Premium History Deep-Dive Route',
-          summary: 'A special heritage course exploring palace highlights and museum treasures.',
-          reasonText: 'Curated based on your high interest in historical artifacts and royal palace architecture.',
-          reasonTextSource: 'LLM_GENERATED',
-          cityName: 'SEOUL',
+          themeCode,
+          title: `${themeCode} Route in ${requestedCityCode.toUpperCase()}`,
+          summary: `A city-specific cultural route built from ${requestedCityCode.toUpperCase()} places.`,
+          reasonText: `Curated from ${requestedCityCode.toUpperCase()} candidates only.`,
+          reasonTextSource: 'TEMPLATE_FALLBACK',
+          cityName: requestedCityCode.toUpperCase(),
           durationHours: 8,
-          items: [
-            {
-              id: 'item-1',
-              itemType: 'PLACE',
-              refId: 'place-1',
-              name: 'Gyeongbokgung Palace',
-              nameKo: '경복궁',
-              nameI18n: { en: 'Gyeongbokgung Palace', ja: '景福宮', 'zh-Hans': '景福宫' },
-              lat: 37.5796,
-              lng: 126.9770,
-              slotType: 'MORNING',
-              primaryType: 'ATTRACTION',
-            },
-            {
-              id: 'item-2',
-              itemType: 'PLACE',
-              refId: 'place-2',
-              name: 'National Museum of Korea',
-              nameKo: '국립중앙박물관',
-              nameI18n: { en: 'National Museum of Korea', ja: '国立中央博物館', 'zh-Hans': '国立中央博物馆' },
-              lat: 37.5240,
-              lng: 126.9804,
-              slotType: 'AFTERNOON',
-              primaryType: 'MUSEUM',
-            },
-          ],
+          items: selectedCandidates.slice(0, 4).map((candidate, index) => ({
+            id: `item-${candidate.id}-${index}`,
+            itemType: candidate.entityType,
+            refId: candidate.id,
+            name: candidate.nameI18n?.en || candidate.nameKo,
+            nameKo: candidate.nameKo,
+            nameI18n: candidate.nameI18n,
+            lat: candidate.lat,
+            lng: candidate.lng,
+            slotType: slotTypes[index] || 'EVENING',
+            primaryType: candidate.primaryType,
+          })),
         },
       });
     }
@@ -57,7 +82,7 @@ export async function GET(
     // 1. Fetch package record
     const { data: pkg, error: pkgError } = await supabaseAdmin
       .from('packages')
-      .select('package_id, title, summary, duration_hours, score, reason_text, reason_text_source, lang, visit_form, theme_id, themes(code), cities(code)')
+      .select('package_id, city_id, title, summary, duration_hours, score, reason_text, reason_text_source, lang, visit_form, theme_id, themes(code), cities(code)')
       .eq('package_id', packageId)
       .maybeSingle();
 
@@ -80,11 +105,16 @@ export async function GET(
     const resolvedItems = [];
     for (const item of (items || [])) {
       if (item.item_type === 'PLACE') {
-        const { data: place } = await supabaseAdmin
+        let placeQuery = supabaseAdmin
           .from('places')
           .select('name_ko, lat, lng, primary_type, place_i18n(lang, name)')
-          .eq('place_id', item.ref_id)
-          .maybeSingle();
+          .eq('place_id', item.ref_id);
+
+        if (pkg.city_id) {
+          placeQuery = placeQuery.eq('city_id', pkg.city_id);
+        }
+
+        const { data: place } = await placeQuery.maybeSingle();
 
         const nameI18n: Record<string, string> = {};
         if (place && Array.isArray(place.place_i18n)) {
@@ -106,11 +136,16 @@ export async function GET(
           primaryType: place?.primary_type || 'ATTRACTION',
         });
       } else {
-        const { data: event } = await supabaseAdmin
+        let eventQuery = supabaseAdmin
           .from('events')
           .select('title_ko, event_i18n(lang, title)')
-          .eq('event_id', item.ref_id)
-          .maybeSingle();
+          .eq('event_id', item.ref_id);
+
+        if (pkg.city_id) {
+          eventQuery = eventQuery.eq('city_id', pkg.city_id);
+        }
+
+        const { data: event } = await eventQuery.maybeSingle();
 
         const nameI18n: Record<string, string> = {};
         if (event && Array.isArray(event.event_i18n)) {
@@ -141,7 +176,7 @@ export async function GET(
         summary: pkg.summary,
         reasonText: pkg.reason_text,
         reasonTextSource: pkg.reason_text_source,
-        cityName: (Array.isArray(pkg.cities) ? pkg.cities[0]?.code : (pkg.cities as any)?.code) || 'SEOUL',
+        cityName: (Array.isArray(pkg.cities) ? pkg.cities[0]?.code : (pkg.cities as any)?.code) || requestedCityCode.toUpperCase(),
         durationHours: pkg.duration_hours,
         items: resolvedItems,
       },

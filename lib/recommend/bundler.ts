@@ -78,7 +78,7 @@ function bundleDayTrip(scored: ScoredCandidate[], input: RecommendInput): Recomm
     }
 
     packages.push({
-      packageId: `pkg-day-${theme.toLowerCase()}-${index}`,
+      packageId: `pkg-day-${input.cityCode}-${theme.toLowerCase()}-${index}`,
       themeCode: theme,
       title: `${theme} Curated One-Day Course`,
       summary: `A special day course focusing on ${theme} in ${input.cityCode.toUpperCase()}.`,
@@ -130,7 +130,7 @@ function bundleStay(scored: ScoredCandidate[], input: RecommendInput): Recommend
     ];
 
     packages.push({
-      packageId: `pkg-stay-${theme.toLowerCase()}-${index}`,
+      packageId: `pkg-stay-${input.cityCode}-${theme.toLowerCase()}-${index}`,
       themeCode: theme,
       title: `${theme} Weekend Stay in ${input.cityCode.toUpperCase()}`,
       summary: `Relaxing staying itinerary exploring ${theme}.`,
@@ -168,7 +168,7 @@ function bundleThemeTour(scored: ScoredCandidate[], input: RecommendInput): Reco
     }));
 
     packages.push({
-      packageId: `pkg-theme-${theme.toLowerCase()}-${index}`,
+      packageId: `pkg-theme-${input.cityCode}-${theme.toLowerCase()}-${index}`,
       themeCode: theme,
       title: `Deep Dive: ${theme} Tour`,
       summary: `An intensive historical/cultural deep-dive package.`,

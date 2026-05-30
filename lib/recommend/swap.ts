@@ -1,35 +1,30 @@
 import { PackageItem } from './types';
 import { supabaseAdmin } from '../supabase/admin';
+import { getCityMockData } from './candidates';
 
 export async function findSwapCandidates(
   packageId: string,
   itemIndex: number,
-  hint?: string             // "indoor" "shorter" etc.
+  hint?: string,             // "indoor" "shorter" etc.
+  cityCode = 'seoul'
 ): Promise<PackageItem[]> {
   const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!hasSupabase) {
-    // Return mock swaps for local environments
-    const mockSwaps: PackageItem[] = [
-      {
-        id: 'swap-place-1',
+    const mockSwaps: PackageItem[] = getCityMockData(cityCode)
+      .filter(candidate => candidate.entityType === 'PLACE')
+      .map((candidate, index) => ({
+        id: `swap-${candidate.id}-${index}`,
         itemType: 'PLACE',
-        refId: 'place-uuid-swap-1',
-        name: 'Deoksugung Palace (Swap Choice)',
-        lat: 37.5658,
-        lng: 126.9752,
-        slotType: 'MORNING'
-      },
-      {
-        id: 'swap-place-2',
-        itemType: 'PLACE',
-        refId: 'place-uuid-swap-2',
-        name: 'Seoul Museum of Art (Indoor Choice)',
-        lat: 37.5641,
-        lng: 126.9738,
-        slotType: 'MORNING'
-      }
-    ];
+        refId: candidate.id,
+        name: candidate.nameI18n?.en || candidate.nameKo,
+        nameKo: candidate.nameKo,
+        nameI18n: candidate.nameI18n,
+        lat: candidate.lat,
+        lng: candidate.lng,
+        slotType: 'MORNING',
+        primaryType: candidate.primaryType,
+      }));
 
     if (hint === 'indoor') {
       return mockSwaps.filter(item => item.name.includes('Museum') || item.name.includes('Art'));
@@ -40,7 +35,8 @@ export async function findSwapCandidates(
   // Retrieve raw places from database
   const { data: places } = await supabaseAdmin
     .from('places')
-    .select('place_id, name_ko, lat, lng, indoor_outdoor')
+    .select('place_id, name_ko, lat, lng, indoor_outdoor, cities!inner(code)')
+    .eq('cities.code', cityCode)
     .limit(5);
 
   let filtered = places || [];

@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const packageId = searchParams.get('packageId');
+    const cityCode = searchParams.get('city') || undefined;
     const itemIndexStr = searchParams.get('itemIndex');
     const hint = searchParams.get('hint') || undefined;
 
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
     }
 
     const itemIndex = parseInt(itemIndexStr, 10);
-    const candidates = await findSwapCandidates(packageId, itemIndex, hint);
+    const candidates = await findSwapCandidates(packageId, itemIndex, hint, cityCode);
 
     return Response.json({ success: true, data: candidates });
   } catch (error: any) {

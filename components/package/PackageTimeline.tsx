@@ -152,6 +152,7 @@ export default function PackageTimeline({ pkg, sessionId, onUpdateItems, onHover
       {/* Swap Modal Container */}
       <SwapModal
         packageId={pkg.packageId}
+        cityCode={pkg.cityName?.toLowerCase()}
         itemIndex={swapIndex !== null ? swapIndex : 0}
         isOpen={swapIndex !== null}
         onClose={() => setSwapIndex(null)}

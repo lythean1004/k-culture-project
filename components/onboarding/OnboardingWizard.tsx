@@ -53,6 +53,18 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
   const [freeTextQuery, setFreeTextQuery] = useState(userSession.freeTextQuery || '');
   const [consentLocation, setConsentLocation] = useState(false);
 
+  const syncWizardSession = (nextStep = step) => {
+    setSession({
+      step: nextStep,
+      lang: locale as any,
+      cityCode: selectedCity,
+      visitForm,
+      transportMode: transportMode as any,
+      interests,
+      freeTextQuery,
+    });
+  };
+
   useEffect(() => {
     if (initialCity) {
       setSelectedCity(initialCity);
@@ -64,7 +76,7 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
     if (step < 4) {
       const nextStep = step + 1;
       setStep(nextStep);
-      setSession({ step: nextStep });
+      syncWizardSession(nextStep);
     }
   };
 
@@ -72,7 +84,7 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
     if (step > 1) {
       const prevStep = step - 1;
       setStep(prevStep);
-      setSession({ step: prevStep });
+      syncWizardSession(prevStep);
     }
   };
 
@@ -134,6 +146,7 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
       const data = await res.json();
       
       if (data.success && data.sessionId) {
+        setSession({ ...sessionData, sessionId: data.sessionId });
         // Redirect to city list page with session query param
         router.push(`/${locale}/city/${selectedCity}?session=${data.sessionId}`);
       } else {
@@ -190,7 +203,10 @@ export default function OnboardingWizard({ locale, initialCity }: OnboardingWiza
               <button
                 key={city.code}
                 type="button"
-                onClick={() => setSelectedCity(city.code)}
+                onClick={() => {
+                  setSelectedCity(city.code);
+                  setSession({ cityCode: city.code });
+                }}
                 className={`relative rounded-xl overflow-hidden border-2 h-36 flex flex-col justify-end p-3 transition-all duration-300 ${
                   selectedCity === city.code
                     ? 'border-purple-500 shadow-lg shadow-purple-500/20 scale-105'

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useSessionStore } from '@/lib/store/session';
 import { PackageItem, RecommendedPackage } from '@/lib/recommend/types';
@@ -22,6 +23,8 @@ interface PackageDetailPageProps {
 
 export default function PackageDetailPage({ params }: PackageDetailPageProps) {
   const { packageId, locale } = params;
+  const searchParams = useSearchParams();
+  const cityParam = searchParams.get('city');
   const t = useTranslations('package');
   const tCommon = useTranslations('common');
 
@@ -42,14 +45,15 @@ export default function PackageDetailPage({ params }: PackageDetailPageProps) {
 
   useEffect(() => {
     fetchPackageDetails();
-  }, [packageId]);
+  }, [packageId, cityParam]);
 
   const fetchPackageDetails = async () => {
     setLoading(true);
     setError(null);
     try {
       const cacheBuster = new Date().getTime();
-      const res = await ofetch<{ success: boolean; data: any; error?: string }>(`/api/packages/${packageId}?_t=${cacheBuster}`);
+      const cityQuery = cityParam ? `&city=${encodeURIComponent(cityParam)}` : '';
+      const res = await ofetch<{ success: boolean; data: any; error?: string }>(`/api/packages/${packageId}?_t=${cacheBuster}${cityQuery}`);
       if (res.success && res.data) {
         setPkg(res.data);
         // Set weather based on city
