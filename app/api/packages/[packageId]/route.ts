@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/admin';
 import { getCityMockData } from '../../../../lib/recommend/candidates';
+import { loadSnapshot } from '../../../../lib/recommend/snapshots';
 import { ThemeCode } from '../../../../lib/recommend/types';
 import { CITY_OPTIONS, dayCountFromVisitForm, formatCityScope, normalizeCityCode, normalizeCityCodes } from '../../../../lib/recommend/cities';
 
@@ -70,6 +71,12 @@ export async function GET(
 ) {
   try {
     const { packageId } = params;
+    if (packageId.startsWith('route-')) {
+      const snapshot = await loadSnapshot(packageId);
+      return snapshot
+        ? Response.json({ success: true, data: snapshot })
+        : Response.json({ success: false, error: 'This route has expired. Generate a new itinerary.' }, { status: 410 });
+    }
     const { searchParams } = new URL(req.url);
     const requestedCityCodes = searchParams.get('cities')
       ? normalizeCityCodes(undefined, searchParams.get('cities')?.split(','))

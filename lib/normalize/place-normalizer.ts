@@ -1,35 +1,14 @@
 import stringSimilarity from 'string-similarity';
 import { supabaseAdmin } from '../supabase/admin';
 import { NormalizedPlace } from '../sources/_types';
+import { cityFromAddress, coordinateFitsCity } from '../recommend/geography';
 
 async function resolveCityId(normalized: NormalizedPlace): Promise<string> {
-  let cityCode = 'seoul';
-  const lookupText = `${normalized.addrKo || ''} ${normalized.nameKo || ''}`;
-  const cityKeywords: Array<[string, string[]]> = [
-    ['incheon', ['인천', '영종', '차이나타운', 'Incheon', 'Yeongjong']],
-    ['suwon', ['수원', 'Suwon']],
-    ['sokcho', ['속초', '설악', 'Sokcho', 'Seorak']],
-    ['gangneung', ['강릉', '주문진', '경포', 'Gangneung', 'Jumunjin', 'Gyeongpo']],
-    ['daejeon', ['대전', 'Daejeon']],
-    ['andong', ['안동', '하회', '도산서원', 'Andong', 'Hahoe']],
-    ['daegu', ['대구', 'Daegu']],
-    ['busan', ['부산', '해운대', '광안리', 'Busan', 'Haeundae', 'Gwangalli']],
-    ['gyeongju', ['경주', '불국사', '첨성대', 'Gyeongju', 'Bulguksa']],
-    ['ulsan', ['울산', 'Ulsan']],
-    ['jeonju', ['전주', 'Jeonju']],
-    ['namwon', ['남원', 'Namwon']],
-    ['gwangju', ['광주', 'Gwangju']],
-    ['mokpo', ['목포', 'Mokpo']],
-    ['yeosu', ['여수', 'Yeosu']],
-    ['tongyeong', ['통영', 'Tongyeong']],
-    ['jeju', ['제주', 'Jeju']],
-  ];
-  const matchedCity = cityKeywords.find(([, keywords]) =>
-    keywords.some(keyword => lookupText.includes(keyword))
-  );
+  const cityCode = cityFromAddress(normalized.addrKo);
 
-  if (matchedCity) {
-    cityCode = matchedCity[0];
+  if (!cityCode) throw new Error('Place address does not identify a supported city');
+  if (normalized.lat !== undefined && normalized.lng !== undefined && !coordinateFitsCity(cityCode, normalized.lat, normalized.lng)) {
+    throw new Error('Place coordinates conflict with its administrative address');
   }
 
   const { data } = await supabaseAdmin
@@ -40,13 +19,7 @@ async function resolveCityId(normalized: NormalizedPlace): Promise<string> {
 
   if (data) return data.city_id;
 
-  const { data: firstCity } = await supabaseAdmin
-    .from('cities')
-    .select('city_id')
-    .limit(1)
-    .single();
-
-  return firstCity?.city_id || '00000000-0000-0000-0000-000000000000';
+  throw new Error(`City ${cityCode} is missing from the database; apply city seeds`);
 }
 
 export async function findOrCreatePlace(normalized: NormalizedPlace): Promise<string> {
@@ -55,6 +28,7 @@ export async function findOrCreatePlace(normalized: NormalizedPlace): Promise<st
     return '00000000-0000-0000-0000-000000000000';
   }
 
+  const cityId = await resolveCityId(normalized);
   // 1단계: source_place_id로 정확 매칭
   const { data: existing } = await supabaseAdmin
     .from('place_source_map')
@@ -63,7 +37,11 @@ export async function findOrCreatePlace(normalized: NormalizedPlace): Promise<st
     .eq('source_place_id', normalized.sourcePlaceId)
     .maybeSingle();
   
-  if (existing) return existing.place_id;
+  if (existing) {
+    const { error } = await supabaseAdmin.from('places').update({ city_id: cityId }).eq('place_id', existing.place_id);
+    if (error) throw new Error(`Failed to correct place city: ${error.code}`);
+    return existing.place_id;
+  }
   
   // 2단계: 좌표 + 이름 유사도 매칭 (다른 소스의 동일 장소)
   if (normalized.lat && normalized.lng && normalized.nameKo) {
@@ -92,7 +70,6 @@ export async function findOrCreatePlace(normalized: NormalizedPlace): Promise<st
   }
   
   // 3단계: 신규 생성
-  const cityId = await resolveCityId(normalized);
   const { data: newPlace, error: insertError } = await supabaseAdmin
     .from('places')
     .insert({

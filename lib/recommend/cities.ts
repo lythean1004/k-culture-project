@@ -193,14 +193,14 @@ export function isCityCode(value?: string | null): value is CityCode {
 }
 
 export function normalizeCityCode(value?: string | null): CityCode {
-  const normalized = value?.toLowerCase();
+  const normalized = value?.trim().toLowerCase();
   return isCityCode(normalized) ? normalized : DEFAULT_CITY_CODE;
 }
 
 export function normalizeCityCodes(cityCode?: string | null, cityCodes?: Array<string | null | undefined>): CityCode[] {
   const rawCodes = cityCodes && cityCodes.length > 0 ? cityCodes : [cityCode];
   const normalized = rawCodes
-    .map(code => code?.toLowerCase())
+    .map(code => code?.trim().toLowerCase())
     .filter(isCityCode)
     .filter((code, index, array) => array.indexOf(code) === index);
 
@@ -229,6 +229,7 @@ export function cityScopeSlug(cityCodes: string[]): string {
 }
 
 export function dayCountFromVisitForm(visitForm: 'DAY_TRIP' | 'STAY_1_3' | 'THEME_TOUR', requestedDays?: number): 1 | 2 | 3 {
+  if (requestedDays === 1) return 1;
   if (requestedDays === 2 || requestedDays === 3) return requestedDays;
   if (visitForm === 'STAY_1_3') return 2;
   if (visitForm === 'THEME_TOUR') return 3;

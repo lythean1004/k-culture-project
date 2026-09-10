@@ -15,4 +15,22 @@ if (!supabaseUrl.startsWith('http')) {
   supabaseUrl = 'https://dummy.supabase.co';
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+let unavailableUntil = 0;
+const unavailable = () => new Response(JSON.stringify({ code: 'BACKEND_UNAVAILABLE', message: 'Database connection unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+  global: {
+    fetch: async (input, init) => {
+      if (Date.now() < unavailableUntil) return unavailable();
+      try {
+        const response = await fetch(input, { ...init, signal: AbortSignal.timeout(3000) });
+        if (response.status === 401 || response.status === 403 || response.status >= 500) unavailableUntil = Date.now() + 30_000;
+        return response;
+      } catch {
+        unavailableUntil = Date.now() + 30_000;
+        return unavailable();
+      }
+    },
+  },
+});

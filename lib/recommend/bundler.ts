@@ -1,5 +1,6 @@
 import { RecommendedPackage, ScoredCandidate, RecommendInput, PackageItem, ThemeCode } from './types';
 import { cityScopeSlug, dayCountFromVisitForm, formatCityScope, normalizeCityCodes } from './cities';
+import { distanceKm } from './geography';
 
 const DAY_SLOTS: PackageItem['slotType'][] = ['MORNING', 'LUNCH', 'AFTERNOON', 'EVENING'];
 
@@ -27,15 +28,19 @@ function bundleCourseItineraries(scored: ScoredCandidate[], input: RecommendInpu
 
     for (let day = 1; day <= dayCount; day += 1) {
       const cityCode = selectedCityCodes[(day - 1) % selectedCityCodes.length];
-      const dayCandidates = selectDayCandidates(scored, theme, cityCode, usedKeys);
+      const remainingDays = Array.from({ length: dayCount - day + 1 }, (_, offset) => selectedCityCodes[(day + offset - 1) % selectedCityCodes.length]).filter(code => code === cityCode).length;
+      const remainingCount = scored.filter(candidate => candidate.cityCode === cityCode && !usedKeys.has(candidateKey(candidate))).length;
+      const limit = Math.min(4, Math.ceil(remainingCount / remainingDays));
+      const dayCandidates = selectDayCandidates(scored, theme, cityCode, usedKeys).slice(0, limit);
 
       dayCandidates.forEach((candidate, slotIndex) => {
         usedKeys.add(candidateKey(candidate));
-        items.push(candidateToPackageItem(candidate, day, DAY_SLOTS[slotIndex] || 'EVENING'));
+        const slot = slotIndex === 0 ? 'MORNING' : slotIndex === 1 && candidate.themes.includes('FOOD') ? 'LUNCH' : slotIndex < 3 ? 'AFTERNOON' : 'EVENING';
+        items.push(candidateToPackageItem(candidate, day, slot));
       });
     }
 
-    if (items.length === 0) return;
+    if (new Set(items.map(item => item.dayNumber)).size !== dayCount) return;
 
     const firstScored = scored.find(candidate => candidate.id === items[0].refId);
     const totalScore = items.reduce((acc, item) => {
@@ -69,7 +74,7 @@ function selectDayCandidates(
   cityCode: string,
   usedKeys: Set<string>
 ): ScoredCandidate[] {
-  const cityCandidates = scored.filter(candidate => candidate.cityCode === cityCode);
+  const cityCandidates = scored.filter(candidate => candidate.cityCode === cityCode).sort((a, b) => b.score.total - a.score.total);
   const themedPlaces = cityCandidates.filter(candidate =>
     candidate.entityType === 'PLACE' &&
     candidate.themes.includes(theme) &&
@@ -100,7 +105,13 @@ function selectDayCandidates(
 
 function pickNext(selected: ScoredCandidate[], ...pools: ScoredCandidate[][]): void {
   for (const pool of pools) {
-    const candidate = pool.find(item => !selected.some(selectedItem => candidateKey(selectedItem) === candidateKey(item)));
+    const last = selected[selected.length - 1];
+    const available = pool.filter(item => !selected.some(selectedItem => candidateKey(selectedItem) === candidateKey(item)));
+    if (last?.lat && last.lng) available.sort((a, b) => {
+      const distance = (item: ScoredCandidate) => item.lat && item.lng ? distanceKm({ lat: last.lat!, lng: last.lng! }, { lat: item.lat, lng: item.lng }) : Infinity;
+      return distance(a) - distance(b);
+    });
+    const candidate = available[0];
     if (candidate) {
       selected.push(candidate);
       return;

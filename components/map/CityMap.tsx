@@ -1,102 +1,88 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { Map as LeafletMap, LayerGroup } from 'leaflet';
+import { CITY_OPTIONS, getCityOption } from '@/lib/recommend/cities';
 import { PackageItem } from '@/lib/recommend/types';
-import { getCityOption, normalizeCityCodes } from '@/lib/recommend/cities';
 
-interface CityMapProps {
+interface Props {
   items: PackageItem[];
   cityCode: string;
   cityCodes?: string[];
+  onCitySelect?: (code: string) => void;
+  activeItemId?: string;
+  onItemSelect?: (id: string) => void;
 }
 
-export default function CityMap({ items = [], cityCode, cityCodes }: CityMapProps) {
-  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
-
+export default function CityMap({ items = [], cityCode, cityCodes, onCitySelect, activeItemId, onItemSelect }: Props) {
+  const root = useRef<HTMLDivElement>(null);
+  const map = useRef<LeafletMap>();
+  const layers = useRef<LayerGroup>();
+  const [ready, setReady] = useState(false);
+  const [tileError, setTileError] = useState(false);
+  const callbacks = useRef({ onCitySelect, onItemSelect });
+  callbacks.current = { onCitySelect, onItemSelect };
   useEffect(() => {
-    // Check if Google Maps JS script is already loaded globally
-    if (typeof window !== 'undefined' && (window as any).google && (window as any).google.maps) {
-      setGoogleMapsLoaded(true);
-    }
+    let cancelled = false;
+    let resize: ResizeObserver | undefined;
+    import('leaflet').then(L => {
+      if (cancelled || !root.current) return;
+      const instance = L.map(root.current, { zoomControl: true, scrollWheelZoom: false }).setView([36, 127.8], 7);
+      map.current = instance;
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 18,
+      }).on('tileerror', () => setTileError(true)).addTo(instance);
+      layers.current = L.layerGroup().addTo(instance);
+      resize = new ResizeObserver(() => instance.invalidateSize());
+      resize.observe(root.current);
+      setReady(true);
+    });
+    return () => { cancelled = true; resize?.disconnect(); map.current?.remove(); map.current = undefined; };
   }, []);
 
-  const selectedCityCodes = normalizeCityCodes(cityCode, cityCodes);
-  const cityLabel = selectedCityCodes.map(code => getCityOption(code).name).join(' + ');
+  const scope = (cityCodes?.length ? cityCodes : [cityCode]).join(',');
+  useEffect(() => {
+    if (!ready || !map.current || !layers.current) return;
+    let cancelled = false;
+    import('leaflet').then(L => {
+      if (cancelled || !map.current || !layers.current) return;
+      const group = layers.current;
+      group.clearLayers();
+      const selected = scope.split(',');
+      const points: [number, number][] = [];
+      if (callbacks.current.onCitySelect) {
+        CITY_OPTIONS.forEach(city => {
+          const chosen = selected.includes(city.code);
+          const marker = L.marker([city.lat, city.lng], { icon: L.divIcon({ className: 'city-map-pin', html: `<span class="city-dot ${chosen ? 'chosen' : ''}"></span>`, iconSize: [18, 18], iconAnchor: [9, 9] }), keyboard: true, title: city.name, alt: city.name });
+          marker.bindTooltip(city.name, { permanent: chosen, direction: 'top', offset: [0, -8] }).on('click', () => callbacks.current.onCitySelect?.(city.code)).addTo(group);
+        });
+      }
+      const byDay = new Map<number, [number, number][]>();
+      items.forEach((item, index) => {
+        if (!Number.isFinite(item.lat) || !Number.isFinite(item.lng)) return;
+        const position: [number, number] = [item.lat!, item.lng!];
+        points.push(position);
+        const day = item.dayNumber || 1;
+        byDay.set(day, [...(byDay.get(day) || []), position]);
+        const marker = L.marker(position, { icon: L.divIcon({ className: 'route-map-pin', html: `<span class="stop-pin day-${day} ${activeItemId === item.id ? 'active' : ''}">${day}.${byDay.get(day)!.length}</span>`, iconSize: [32, 32], iconAnchor: [16, 16] }), title: item.name, alt: item.name });
+        const popup = document.createElement('div');
+        popup.textContent = `Day ${day} · ${item.name}`;
+        marker.bindPopup(popup).on('click', () => callbacks.current.onItemSelect?.(item.id)).addTo(group);
+        if (activeItemId === item.id) marker.openPopup();
+      });
+      byDay.forEach((positions, day) => {
+        if (positions.length > 1) L.polyline(positions, { color: ['#087f72', '#e05b48', '#4479bc'][(day - 1) % 3], weight: 3, dashArray: '6 8' }).addTo(group);
+      });
+      if (!points.length) selected.forEach(code => { const city = getCityOption(code); points.push([city.lat, city.lng]); });
+      if (callbacks.current.onCitySelect && !items.length) map.current.fitBounds([[33.1, 125.7], [38.6, 130]], { padding: [24, 24] });
+      else map.current.fitBounds(L.latLngBounds(points), { padding: [55, 55], maxZoom: 12 });
+    });
+    return () => { cancelled = true; };
+  }, [ready, items, scope, activeItemId]);
 
-  // We mock a gorgeous interactive map interface in case Google Maps API is not loaded or key is missing.
-  // This satisfies standard visual aesthetics and prevents blank screens.
-  return (
-    <div className="w-full h-full relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 flex flex-col justify-between shadow-2xl">
-      {/* Fallback Beautiful Virtual Map */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-950/20 to-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-4">
-        {/* Abstract Map Grid Design */}
-        <div className="absolute inset-0 opacity-15 pointer-events-none mix-blend-overlay">
-          <svg width="100%" height="100%">
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
-        </div>
-
-        {/* Dynamic Markers Represented visually */}
-        <div className="relative w-full max-w-sm h-64 border border-purple-500/10 rounded-xl bg-slate-900/60 p-4 flex items-center justify-center">
-          <div className="absolute text-[11px] font-semibold text-purple-400 bg-slate-950/80 px-2 py-0.5 border border-purple-500/20 rounded top-4 left-4 uppercase tracking-widest">
-            {cityLabel} Area View
-          </div>
-
-          {selectedCityCodes.map(code => {
-            const city = getCityOption(code);
-            return (
-              <div
-                key={code}
-                className="absolute rounded-lg border border-cyan-500/20 bg-cyan-950/50 px-2 py-1 text-[9px] font-bold text-cyan-200"
-                style={{ left: `${city.mapX}%`, top: `${city.mapY}%` }}
-              >
-                {city.name}
-              </div>
-            );
-          })}
-          
-          <div className="relative w-full h-full flex items-center justify-center">
-            {/* Center Anchor Pin */}
-            <div className="w-4 h-4 rounded-full bg-purple-500 animate-ping absolute"></div>
-            <div className="w-2.5 h-2.5 rounded-full bg-purple-400 absolute shadow-lg shadow-purple-500/50"></div>
-
-            {/* Stops Connecting Paths */}
-            {items.map((item, idx) => {
-              // Distribute pseudo positions on screen
-              const angle = (idx * 2 * Math.PI) / (items.length || 1);
-              const x = Math.cos(angle) * 75;
-              const y = Math.sin(angle) * 75;
-
-              return (
-                <div
-                  key={item.id}
-                  className="absolute flex flex-col items-center group transition-all duration-300"
-                  style={{ transform: `translate(${x}px, ${y}px)` }}
-                >
-                  <div className="w-7 h-7 rounded-full bg-slate-950 border-2 border-pink-500 text-[10px] font-bold flex items-center justify-center text-pink-400 shadow-md group-hover:scale-110 transition-transform">
-                    {item.dayNumber || idx + 1}
-                  </div>
-                  <div className="absolute top-8 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded text-[9px] font-semibold whitespace-nowrap opacity-80 max-w-[100px] overflow-hidden text-ellipsis shadow-lg text-slate-200">
-                    {item.cityCode ? `${getCityOption(item.cityCode).name}: ` : ''}{item.name}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="z-10 space-y-1">
-          <h4 className="font-bold text-sm text-slate-300">Interactive Route Visualizer</h4>
-          <p className="text-[11px] text-slate-500 max-w-xs leading-normal">
-            Displaying {items.length} route stops mapped for the selected curation package in {cityLabel.toUpperCase()}.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="travel-map"><div ref={root} className="travel-map-canvas" aria-label="Travel map" />
+    {!ready && <div className="map-loading" role="status">Loading map...</div>}
+    {tileError && <div className="map-note">Map tiles are unavailable. Place coordinates remain visible.</div>}
+    {items.length > 1 && <div className="map-caption">Stop sequence · dotted lines are not road directions</div>}
+  </div>;
 }

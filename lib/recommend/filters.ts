@@ -1,5 +1,7 @@
 import { Candidate, RecommendContext, RecommendInput } from './types';
 import { normalizeCityCodes } from './cities';
+import { coordinateFitsCity, distanceKm } from './geography';
+import { getCityOption } from './cities';
 
 const MAX_DISTANCE_BY_MODE: Record<'WALK' | 'TRANSIT' | 'CAR', number> = {
   WALK: 2.0,      // 2km
@@ -42,11 +44,13 @@ export function applyFilters(
   const isMultiCity = selectedCityCodes.length > 1;
 
   return candidates.filter(c => {
+    if (!c.cityCode || !selectedCityCodes.includes(c.cityCode as any)) return false;
+    if (c.entityType === 'PLACE' && !coordinateFitsCity(c.cityCode, c.lat, c.lng)) return false;
     // 1. Operating hours check
-    if (!isOperatingNow(c, context.now)) return false;
+    // Opening hours require verified per-place data, not a weekday heuristic.
     
     // 2. Transport mode distance boundary check
-    if (!isMultiCity && input.currentLocation && c.lat && c.lng) {
+    if (!isMultiCity && input.currentLocation && c.lat && c.lng && distanceKm(input.currentLocation, getCityOption(selectedCityCodes[0])) < 30) {
       const dist = haversine(input.currentLocation, { lat: c.lat, lng: c.lng });
       const maxDist = MAX_DISTANCE_BY_MODE[input.transportMode];
       if (dist > maxDist) return false;

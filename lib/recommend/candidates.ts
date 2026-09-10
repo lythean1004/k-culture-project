@@ -3,6 +3,7 @@ import { embedWithCache } from '../ai/embedding/cache';
 import { searchSimilarPlaces } from '../ai/embedding/search';
 import { Candidate, RecommendInput, ThemeCode } from './types';
 import { CityCode, isCityCode, normalizeCityCodes } from './cities';
+import { cityFromAddress, coordinateFitsCity } from './geography';
 
 const NULL_UUID = '00000000-0000-0000-0000-000000000000';
 
@@ -232,18 +233,23 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
   let candidates: Candidate[] = [];
   
   try {
-    const { data: places } = await supabaseAdmin
+    const { data: places, error: placesError } = await supabaseAdmin
       .from('places')
-      .select('place_id, city_id, name_ko, lat, lng, primary_type, sub_type, indoor_outdoor, official_url, phone, place_theme_map(theme_id, themes(code)), place_i18n(lang, name)')
+      .select('*, place_theme_map(theme_id, themes(code)), place_i18n(lang, name)')
       .in('city_id', cityIds);
       
-    const { data: events } = await supabaseAdmin
+    const { data: events, error: eventsError } = await supabaseAdmin
       .from('events')
-      .select('event_id, city_id, title_ko, official_url, genre, event_i18n(lang, title)')
+      .select('event_id, city_id, title_ko, official_url, genre, event_i18n(lang, title), event_sessions(start_at, end_at)')
       .in('city_id', cityIds)
       .eq('status', 'ACTIVE');
 
+    if (placesError) console.warn('[Candidates] Places query failed:', placesError.code);
+    if (eventsError) console.warn('[Candidates] Events query failed:', eventsError.code);
     places?.forEach((p: any) => {
+      const code = cityIdToCode.get(p.city_id);
+      const addressCity = cityFromAddress(p.addr_ko || p.address);
+      if (!code || (addressCity && addressCity !== code) || !coordinateFitsCity(code, Number(p.lat), Number(p.lng))) return;
       // Unwrap Supabase relations
       const themeMaps = p.place_theme_map as any[];
       const themes = Array.isArray(themeMaps) 
@@ -278,6 +284,9 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
     });
     
     events?.forEach((e: any) => {
+      if (!cityIdToCode.has(e.city_id)) return;
+      // Do not offer stale or undated seed events as bookable itinerary stops.
+      if (!e.event_sessions?.some((session: any) => new Date(session.end_at || session.start_at).getTime() >= Date.now())) return;
       const nameI18n: Record<string, string> = {};
       if (Array.isArray(e.event_i18n)) {
         e.event_i18n.forEach((item: any) => {
@@ -303,7 +312,7 @@ async function fetchRuleBasedCandidates(input: RecommendInput): Promise<Candidat
     console.warn('[Candidates] Supabase query failed, using mock data:', err);
   }
 
-  const coveredCityCodes = new Set(candidates.map(candidate => candidate.cityCode).filter(Boolean));
+  const coveredCityCodes = new Set(candidates.filter(candidate => candidate.entityType === 'PLACE').map(candidate => candidate.cityCode).filter(Boolean));
   const missingCityCodes = selectedCityCodes.filter(cityCode => !coveredCityCodes.has(cityCode));
 
   if (missingCityCodes.length > 0) {

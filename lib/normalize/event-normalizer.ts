@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../supabase/admin';
 import { NormalizedEvent } from '../sources/_types';
+import { cityFromAddress } from '../recommend/geography';
 
 export async function findOrCreateEvent(normalized: NormalizedEvent): Promise<string> {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -17,14 +18,17 @@ export async function findOrCreateEvent(normalized: NormalizedEvent): Promise<st
 
   if (existing) return existing.event_id;
 
-  // 2. Resolve city_id (using first city as default fallback)
+  const cityCode = cityFromAddress(normalized.venueAddr);
+  if (!cityCode) throw new Error('Event venue address does not identify a supported city');
+  // Resolve the actual venue city; unknown locations must not become Seoul.
   const { data: city } = await supabaseAdmin
     .from('cities')
     .select('city_id')
-    .limit(1)
-    .single();
+    .eq('code', cityCode)
+    .maybeSingle();
 
-  const cityId = city?.city_id || '00000000-0000-0000-0000-000000000000';
+  if (!city) throw new Error(`City ${cityCode} is missing from the database`);
+  const cityId = city.city_id;
 
   // 3. Map place by venueName if possible
   let venuePlaceId: string | null = null;
@@ -32,6 +36,7 @@ export async function findOrCreateEvent(normalized: NormalizedEvent): Promise<st
     const { data: place } = await supabaseAdmin
       .from('places')
       .select('place_id')
+      .eq('city_id', cityId)
       .ilike('name_ko', `%${normalized.venueName}%`)
       .limit(1)
       .maybeSingle();

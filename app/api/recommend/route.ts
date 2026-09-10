@@ -13,6 +13,7 @@ import { generateReasonText } from '../../../lib/recommend/reason';
 import { RecommendContext, RecommendInput, ThemeCode } from '../../../lib/recommend/types';
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { CITY_CODE_VALUES, dayCountFromVisitForm, normalizeCityCodes, visitFormFromDayCount } from '../../../lib/recommend/cities';
+import { storeSnapshot } from '../../../lib/recommend/snapshots';
 
 const NULL_UUID = '00000000-0000-0000-0000-000000000000';
 
@@ -22,7 +23,7 @@ const RecommendInputSchema = z.object({
   cityCodes: z.array(z.enum(CITY_CODE_VALUES)).max(3).optional(),
   tripDays: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   visitForm: z.enum(['DAY_TRIP', 'STAY_1_3', 'THEME_TOUR']),
-  interests: z.array(z.string()).max(5),
+  interests: z.array(z.enum(['HISTORY', 'TRADITIONAL_MUSIC', 'MODERN_ART', 'FAMILY', 'NIGHT', 'WELLNESS', 'FOOD', 'FESTIVAL'])).max(5),
   freeTextQuery: z.string().max(200).optional(),
   lang: z.enum(['en', 'ja', 'zh-Hans', 'zh-Hant']),
   transportMode: z.enum(['WALK', 'TRANSIT', 'CAR']),
@@ -148,7 +149,7 @@ export async function POST(req: NextRequest) {
     } as unknown as RecommendInput;
     
     // Bump version when recommendation composition rules change.
-    const cacheKey = `rec:v8:${hashInput(input)}`;
+    const cacheKey = `rec:v11:${hashInput(input)}`;
     const cached = await cache.get(cacheKey);
     if (cached) {
       return Response.json(JSON.parse(cached));
@@ -175,8 +176,11 @@ export async function POST(req: NextRequest) {
       pkg.reasonTextSource = source;
     }
     
-    await savePackages(packages, input);
-    const result = { packages };
+    for (const pkg of packages) {
+      pkg.packageId = `route-${crypto.randomUUID()}`;
+      await storeSnapshot(pkg);
+    }
+    const result = { packages, dataSource: packages.some(pkg => pkg.items.some(item => item.source === 'mock')) ? 'local-catalog' : 'database' };
     await cache.set(cacheKey, JSON.stringify(result), 300); // 5 minutes cache TTL
     
     return Response.json(result);

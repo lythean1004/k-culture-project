@@ -1,16 +1,18 @@
 import Redis from 'ioredis';
 
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisUrl = process.env.REDIS_URL;
 
 class RedisCache {
   private client: Redis | null = null;
   private memoryCache = new Map<string, { value: string; expiresAt?: number }>();
 
   constructor() {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' && redisUrl) {
       this.client = new Redis(redisUrl, {
         lazyConnect: true,
-        maxRetriesPerRequest: 3,
+        maxRetriesPerRequest: 1,
+        connectTimeout: 1500,
+        retryStrategy: () => null,
       });
       
       this.client.on('error', (err) => {
@@ -34,7 +36,7 @@ class RedisCache {
       const val = await this.client.get(key);
       if (val) {
         // Sync back to memory
-        this.memoryCache.set(key, { value: val });
+        this.memoryCache.set(key, { value: val, expiresAt: Date.now() + 30_000 });
       }
       return val;
     } catch (e) {
